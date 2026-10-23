@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Hệ Sinh Thái Hành Tinh Xanh - Stage 2</title>
+<!-- Chosen Palette: Deep Cosmic Teal, Solar Gold, Emerald Green & Terracotta -->
+<!-- Application Structure Plan: Mo hinh giao dien isometric interactive 3D bang HTML5 Canvas, tich hop 6 man choi voi do kho tang dan (Giao doa mat troi, Bao mat troi, Dem bang gia, Dai tuan hoan), he thong am thanh tong hop Web Audio API, va bang dieu khien phan phoi nang luong sinh thai. -->
+<!-- Visualization & Content Choices: Su dung thuan HTML5 Canvas 2D render khoi dat isometric, sinh vat (cay, dong vat an co, dong vat an thit), dam may, hat nuoc va hieu ung tia set/truong nang luong. Khong su dung SVG hay Mermaid JS de dam bao hieu nang 60fps tren moi thiet bi mobile va desktop. -->
+<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#14202b;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;width:100vw;height:100vh;touch-action:none;-webkit-tap-highlight-color:transparent}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+(()=>{
+'use strict';
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const N=8,TICK=0.25,DUR=45,TT=180,TAU=Math.PI*2;
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const pick=a=>a[(Math.random()*a.length)|0];
+
+const LEVELS=[
+ {name:'Khởi động',w:50,g:{p:10,h:2,c:0},drift:false,hint:['Kéo "Góc chiếu" để rải nắng, đừng đứng yên!','Đứng một chỗ quá lâu là đất khô cháy đó.']},
+ {name:'Chuỗi thức ăn',w:40,g:{p:12,h:3,c:1},drift:false,hint:['Cây nuôi ăn cỏ, ăn cỏ nuôi ăn thịt.','Tiêu cự cao + ít nắng toàn cục = mưa.']},
+ {name:'Mặt trời trôi',w:30,g:{p:14,h:4,c:2},drift:true,hint:['Mặt trời đang trôi, hãy chỉnh liên tục!','Hơi nước quá nhiều sẽ làm cả hành tinh nóng lên.']},
+ {name:'Bão mặt trời',w:40,g:{p:12,h:3,c:1},drift:false,flare:true,hint:['Chú ý vùng cảnh báo bão mặt trời! Né hoặc làm mờ tiêu cự.']},
+ {name:'Đêm băng giá',w:50,g:{p:12,h:3,c:1},drift:false,dn:true,hint:['Đêm xuống nhiệt độ giảm sâu. Gom nắng vào một chỗ để chống đóng băng!']},
+ {name:'Đại tuần hoàn',w:30,g:{p:14,h:4,c:2},drift:true,flare:true,dn:true,hint:['Thử thách tổng hợp: Mặt trời trôi, bão flare và chu kỳ ngày đêm!']}
+];
+const WIN_MSG=[
+ 'Cây mọc, cỏ nhai, bình yên ghê.',
+ 'Chuỗi thức ăn chạy mượt như phim tài liệu.',
+ 'Bạn đuổi theo mặt trời giỏi thật đấy!',
+ 'Bão mặt trời không làm khó được bạn!',
+ 'Xử lý đêm băng giá cực kỳ ấm áp.',
+ 'Bạn đã chinh phục Đại tuần hoàn hoàn hảo!'
+];
+const LOSE_COL=['Hành tinh vừa thành bánh tráng nướng!','Bạn nướng chín cả hệ sinh thái rồi!','Sa mạc hóa nhanh hơn cả deadline!'];
+const LOSE_TIME=['Hết giờ mà hệ sinh thái chưa đạt cân bằng!','Thiên nhiên cần thêm nắng khéo hơn chút.'];
+
+// ---------- State ----------
+let W=0,H=0,DPR=1,S=1;
+let state='menu',stateT=0,lvl=0,loseMsg='',unlockedLvl=0,levelStars=[0,0,0,0,0,0];
+let s1=0.5,s2=0.05;
+let tiles=[],herbs=[],carns=[],parts=[],embQ=[],btns=[];
+let ticks=0,acc=0,vapor=0,o2=0,rainT=0,photoT=0,photoCool=0,flash=0,shakeT=0,cT=0,tAll=0,hintT=0;
+let collapsed=false,cOrig={x:3.5,y:3.5},muted=false;
+let hs={x:3.5,y:3,r:2.5,peak:.8};
+
+// Mechanics State
+let flareTimer=0,flareActive=false,flareWarn=false,flarePos={x:3,y:3};
+let vaporOver100Timer=0,stormActive=false,stormTimer=0,stormStrikeTimer=0;
+let dayNightFactor=1;
+
+const lay={tw:40,th:20,ox:0,oy:0,cx:0,cy:0,hudH:134,top:134,bot:400};
+
+function resize(){
+ DPR=Math.min(window.devicePixelRatio||1,2.5);
+ W=window.innerWidth;H=window.innerHeight;
+ cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);
+ S=Math.max(.85,Math.min(1.3,W/390));
+ const top=134*S,bot=H*0.65;
+ const tw=Math.max(20,Math.min((W-16)/8,(bot-top-70)/4));
+ lay.tw=tw;lay.th=tw/2;lay.top=top;lay.bot=bot;lay.hudH=top;
+ lay.cx=W/2;lay.cy=top+(bot-top)/2+22;
+ lay.ox=lay.cx;lay.oy=lay.cy-3.5*lay.th;
+}
+function proj(x,y){return [lay.ox+(x-y)*lay.tw/2,lay.oy+(x+y)*lay.th/2];}
+
+// ---------- Audio Synthesis Engine ----------
+let AC=null,master=null,ambientGain=null,noiseBuf=null;const lastS={};
+function initAudio(){
+ if(AC){if(AC.state==='suspended')AC.resume();return;}
+ try{
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  const comp=AC.createDynamicsCompressor();comp.threshold.value=-18;comp.ratio.value=6;
+  master=AC.createGain();master.gain.value=muted?0:.5;
+  master.connect(comp);comp.connect(AC.destination);
+
+  noiseBuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);
+  const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+
+  startAmbient();
+ }catch(e){AC=null;}
+}
+
+function startAmbient(){
+ if(!AC)return;
+ ambientGain=AC.createGain();
+ ambientGain.gain.value=0.08;
+ ambientGain.connect(master);
+
+ const s=AC.createBufferSource();s.buffer=noiseBuf;s.loop=true;
+ const fl=AC.createBiquadFilter();fl.type='lowpass';fl.frequency.value=180;
+ s.connect(fl);fl.connect(ambientGain);s.start();
+
+ const o1=AC.createOscillator(), o2=AC.createOscillator();
+ o1.type='sine';o1.frequency.value=110;
+ o2.type='triangle';o2.frequency.value=164.81;
+ const gPad=AC.createGain();gPad.gain.value=0.15;
+ o1.connect(gPad);o2.connect(gPad);gPad.connect(ambientGain);
+ o1.start();o2.start();
+}
+
+function gate(n,gap){const t=performance.now()/1000;if(lastS[n]&&t-lastS[n]<gap)return false;lastS[n]=t;return true;}
+function tone(f0,f1,dur,vol,delay,type){
+ if(!AC||muted)return;delay=delay||0;
+ const t=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();
+ o.type=type||'sine';o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t+dur);
+ g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(vol,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+ o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+.05);
+}
+function noise(dur,type,f0,f1,vol,delay,q){
+ if(!AC||muted)return;delay=delay||0;
+ const t=AC.currentTime+delay,s=AC.createBufferSource();s.buffer=noiseBuf;s.loop=true;
+ const fl=AC.createBiquadFilter();fl.type=type;fl.Q.value=q||.7;
+ fl.frequency.setValueAtTime(f0,t);fl.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur);
+ const g=AC.createGain();g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(vol,t+.03);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+ s.connect(fl);fl.connect(g);g.connect(master);s.start(t);s.stop(t+dur+.05);
+}
+const sfx={
+ pop(){if(gate('pop',.08))tone(620,180,.14,.14);},
+ splash(){if(gate('splash',.15))noise(.22,'bandpass',1800,600,.12,0,.8);},
+ sizzle(){if(gate('sizzle',.3))noise(.35,'highpass',6000,6000,.035);},
+ chirpH(){if(gate('chirp',.18)){tone(740,780,.07,.1);tone(990,1000,.09,.1,.08);}},
+ chirpC(){if(gate('chirp',.18)){tone(330,300,.08,.1);tone(247,230,.1,.1,.09);}},
+ boom(){tone(95,28,1.3,.5);noise(1.3,'lowpass',2400,150,.28);},
+ win(){tone(523,523,.25,.14);tone(659,659,.25,.14,.15);tone(784,784,.5,.14,.3);},
+ thunder(){
+  tone(120,30,0.8,0.4);
+  noise(0.9,'lowpass',1200,80,0.35,0,2);
+ },
+ crackle(){
+  noise(0.12,'highpass',8000,2000,0.25);
+  tone(1200,400,0.08,0.2,'sawtooth');
+ }
+};
+
+// ---------- Ecosystem Simulation ----------
+function hotspot(t){
+ const f=s2,r=3-1.8*f,peak=.6+.9*f;
+ let x=s1*7;
+ if(LEVELS[lvl].drift){const u=(t*0.4)%12;x+=u<3?u:(u<9?6-u:u-12);}
+ x=clamp(x,-1,8);
+ const k=clamp(x/7,0,1);
+ return {x:x,y:5.8-2.6*Math.sin(Math.PI*k),r:r,peak:peak};
+}
+function lightAt(h,x,y){
+ const dx=x-h.x,dy=y-h.y,s=.75*h.r;
+ let l = .15+h.peak*Math.exp(-(dx*dx+dy*dy)/(2*s*s));
+ if(LEVELS[lvl].dn){
+  l *= dayNightFactor;
+ }
+ if(flareActive && Math.abs(x-flarePos.x)<=1 && Math.abs(y-flarePos.y)<=1){
+  l += 1.8;
+ }
+ return l;
+}
+
+function startLevel(i){
+ lvl=i;const L=LEVELS[i];
+ tiles=[];for(let k=0;k<64;k++)tiles.push({T:30.5,W:L.w,P:0,des:false,hot:0,wv:0,frozen:false});
+ herbs=[];carns=[];parts=[];embQ=[];
+ ticks=0;acc=0;vapor=0;o2=0;rainT=0;photoT=0;photoCool=0;flash=0;shakeT=0;cT=0;hintT=0;collapsed=false;
+ flareTimer=0;flareActive=false;flareWarn=false;
+ vaporOver100Timer=0;stormActive=false;stormTimer=0;stormStrikeTimer=0;dayNightFactor=1;
+ state='play';stateT=0;
+}
+function counts(){let p=0;for(const t of tiles)if(!t.des&&t.P>=25)p++;return {p:p,h:herbs.length,c:carns.length};}
+function plantList(){const a=[];for(let i=0;i<64;i++){const t=tiles[i];if(!t.des&&t.P>=25)a.push({x:i%N,y:(i/N)|0});}return a;}
+function nearest(a,list){let b=null,bd=1e9;for(const o of list){const d=Math.abs(o.x-a.x)+Math.abs(o.y-a.y);if(d<bd){bd=d;b=o;}}return b;}
+function stepToward(a,tx,ty){
+ const dx=tx-a.x,dy=ty-a.y;if(!dx&&!dy)return;
+ const ax=Math.abs(dx),ay=Math.abs(dy);
+ if(ax>ay||(ax===ay&&Math.random()<.5))a.x+=Math.sign(dx);else a.y+=Math.sign(dy);
+}
+function wander(a){
+ const d=pick([[1,0],[-1,0],[0,1],[0,-1]]);const x=a.x+d[0],y=a.y+d[1];
+ if(x>=0&&x<N&&y
