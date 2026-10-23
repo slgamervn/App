@@ -1530,8 +1530,6 @@ function drawMinigame(){
  txt('Mục tiêu: Cân bằng các hệ số để nhận thêm vôi/điện phân!', cx, H*0.30, 13*S, '#ffe28a', 'center', '500');
 
  txt(minigameData.eq.name, cx, H*0.36, 16*S, '#fff', 'center', '700');
- formulaText(minigameData.eq.q, cx, H*0.44, 18*S, '#8ef0a0', 'center', '700');
-
  // Hệ số tương tác trực tiếp: chạm dấu trừ/cộng để chỉnh từng hệ số.
  let coefficientIndex=0;
  const shown=minigameData.eq.q.replace(/__/g,()=>String(minigameData.vals[coefficientIndex++]));
