@@ -20,10 +20,17 @@ canvas{display:block;width:100vw;height:100vh;height:100dvh;touch-action:none;us
 'use strict';
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const FONT_STACK='system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Helvetica Neue",Arial,sans-serif';
+const SUPABASE_URL="https://nqtdriavarupnoqwdkfc.supabase.co"; // Project URL Supabase.
+const SUPABASE_ANON_KEY="sb_publishable_RAJFcVEqpNsLs27jmEKmyQ_sFqtBdr-"; // Publishable key công khai; không dùng service_role.
+let prngState=(Date.now()>>>0),prngNext=null,raceSeed=null;
+function seedRandom(seed){prngState=(Number(seed)>>>0)||0x6d2b79f5;prngNext=mulberry32(prngState);}
+function rand(){if(!prngNext)prngNext=mulberry32(prngState);return prngNext();}
+function mulberry32(seed){let a=seed>>>0;return function(){a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
 const normalizeData=v=>{if(typeof v==='string')return v.normalize('NFC');if(Array.isArray(v))return v.forEach((x,i)=>v[i]=normalizeData(x)),v;if(v&&typeof v==='object')for(const k of Object.keys(v))v[k]=normalizeData(v[k]);return v;};
 const N=8,TICK=0.25,DUR=45,TT=180,TAU=Math.PI*2;
 const clamp=(v,a,b)=>{v=Number(v);return isNaN(v)?a:(v<a?a:(v>b?b:v));};
-const pick=a=>a[(Math.random()*a.length)|0];
+const pick=a=>a[(rand()*a.length)|0];
+const pickVisual=a=>a[(Math.random()*a.length)|0];
 
 const LEVELS=[
  {name:'Khởi động',w:50,g:{p:10,h:2,c:0},drift:false,chem:false,hint:['Kéo "Góc chiếu" để rải nắng, đừng đứng yên!','Đứng một chỗ quá lâu là đất khô cháy đó.']},
@@ -68,6 +75,17 @@ function saveStore(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){
 
 let W=0,H=0,DPR=1,S=1,VIEWW=0,gameOffset=0,canvasRect=null;
 let state='menu',stateT=0,lvl=0,loseMsg='',unlockedLvl=loadStore('p_unlocked',0),levelStars=loadStore('p_stars',[0,0,0,0,0,0,0,0,0,0,0,0]);
+const ONLINE_ALPHABET='23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+function safeText(v,max=24){if(typeof v!=='string')return '';try{return v.normalize('NFC').replace(/[\u0000-\u001f\u007f]/g,'').replace(/[^\p{L}\p{N} ]/gu,'').trim().slice(0,max);}catch(_){return v.replace(/[^A-Za-z0-9 ]/g,'').trim().slice(0,max);}}
+function randomId(){let out='';for(let i=0;i<8;i++)out+=ONLINE_ALPHABET[(Math.random()*ONLINE_ALPHABET.length)|0];return out;}
+function loadPlayerId(){try{let v=localStorage.getItem('pg_online_id');if(/^[A-Za-z0-9]{8}$/.test(v||''))return v;v=Array.from({length:8},()=> 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.random()*36|0]).join('');localStorage.setItem('pg_online_id',v);return v;}catch(_){return randomId().toLowerCase();}}
+const playerId=loadPlayerId();
+let playerName='Khach'+String(100+Math.floor(Math.random()*900)),playerColor=Math.floor(Math.random()*10),onlineNote='',onlineReachable=false,serverOffset=0,serverTimeReady=false;
+try{playerName=safeText(localStorage.getItem('pg_online_name')||'')||playerName;const savedColor=localStorage.getItem('pg_online_color');if(savedColor!==null&&/^\d+$/.test(savedColor))playerColor=clamp(Number(savedColor),0,9);localStorage.setItem('pg_online_color',String(playerColor));}catch(_){}
+let inputOverlay=null,inputValue='',inputPurpose='',pendingRoomAction='join',roomCode='',roomData=null,roomStop=null,roomHeartbeat=null,roomRankTimer=null,roomUnsubscribed=false,roomResultsShown=false,firstFinisherAt=0,roomStartHandled=false,onlineScoreSent=false,onlineScoreRetry=false,onlineScorePayload=null,onlineScoreKey=null;
+let lbLevel=0,lbRows=[],lbLoading=false,lbError='',lbCache={},lbCacheAt={},lbReturnState='menu',raceCountdown=0,lastRoomProgressAt=0,lastRoomHeartbeatAt=0,lastRoomUpdateAt=0,raceFinishAt=0,confettiUntil=0;
+const PLAYER_COLORS=['#66d9a5','#ffca6a','#8ecbff','#e6a0ff','#ff9b8f','#b6e36d','#69e0dc','#ffa7cf','#c0b4ff','#e8e8e8'];
+const ONLINE_OFFLINE_NOTE='Chưa kết nối máy chủ trực tuyến.';
 let s1=0.5,s2=0.05;
 let tiles=[],herbs=[],carns=[],parts=[],embQ=[];
 const worldObjects=[];
@@ -196,7 +214,7 @@ function resize(){
  offBloomCv.width=Math.round(vw*DPR*0.25); offBloomCv.height=Math.round(H*DPR*0.25);
  terrainDirty=true;
  S=Math.max(.75,Math.min(1.3,Math.min(W,H)/390));
- canvasRect=cv.getBoundingClientRect();
+ canvasRect=cv.getBoundingClientRect();positionTextInput();
  const top=110*S,bot=H*0.72;
  const tw=Math.max(18,Math.min((W-24)/8,(bot-top-40)/4));
  lay.tw=tw;lay.th=tw/2;lay.top=top;lay.bot=bot;
@@ -304,6 +322,58 @@ const sfx={
  codexChime(){tone(880,1320,.3,.2);tone(1320,1760,.4,.2,.15);}
 };
 
+// ---------- Stage 7A: Supabase REST online layer ----------
+const dbBase=()=>String(SUPABASE_URL||'').trim().replace(/\/+$/,'');
+const dbConfigured=()=>!!(dbBase()&&String(SUPABASE_ANON_KEY||'').trim());
+const dbTable=()=>dbBase()+'/rest/v1/online_nodes';
+function dbHeaders(extra={}){return {'apikey':SUPABASE_ANON_KEY,'Content-Type':'application/json',...extra};}
+async function dbFetch(url,options={}){if(!dbConfigured())return null;for(let attempt=0;attempt<3;attempt++){let ctl,timer;try{ctl=new AbortController();timer=setTimeout(()=>ctl.abort(),5000);const response=await fetch(url,{...options,signal:ctl.signal});if(!response.ok)throw new Error('HTTP '+response.status);const text=await response.text();clearTimeout(timer);return text?JSON.parse(text):true;}catch(_){clearTimeout(timer);if(attempt<2)await new Promise(r=>setTimeout(r,250*(attempt+1)));else{onlineReachable=false;onlineNote='Không kết nối được máy chủ. Chế độ chơi đơn vẫn hoạt động.';}}}return null;}
+function nodeQuery(path,descendants=false){const params=new URLSearchParams({select:'path,value'});if(descendants){params.set('path','like.'+path.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'/*');}else params.set('path','eq.'+path);return dbTable()+'?'+params.toString();}
+async function dbRows(path,descendants=false){const url=nodeQuery(path,descendants);return await dbFetch(url,{method:'GET',headers:dbHeaders()});}
+function putNested(root,parts,value){if(!parts.length)return value;if(!root||typeof root!=='object'||Array.isArray(root))root={};let cur=root;for(let i=0;i<parts.length-1;i++){const k=parts[i];if(!cur[k]||typeof cur[k]!=='object'||Array.isArray(cur[k]))cur[k]={};cur=cur[k];}if(value===undefined)delete cur[parts[parts.length-1]];else cur[parts[parts.length-1]]=value;return root;}
+function buildTree(path,rows){const rootRow=rows.find(r=>r.path===path);let root=rootRow?rootRow.value:{};if(root===null||typeof root!=='object'||Array.isArray(root))root=rootRow?root:{};const prefix=path?path+'/':'';for(const row of rows.filter(r=>r.path!==path&&r.path.startsWith(prefix)).sort((a,b)=>a.path.length-b.path.length)){const parts=row.path.slice(prefix.length).split('/').filter(Boolean);if(parts.length)root=putNested(root,parts,row.value);}return rootRow||rows.some(r=>r.path.startsWith(prefix))?root:null;}
+async function dbGet(path,query){if(!dbConfigured())return null;path=String(path||'').replace(/^\/+|\/+$/g,'');if(!path){const rows=await dbRows('rooms',true);if(!rows)return null;const out={};for(const row of rows){const parts=row.path.split('/');if(parts.length>=2){const code=parts[1];if(!out[code])out[code]={};const v=buildTree('rooms/'+code,rows.filter(x=>x.path==='rooms/'+code||x.path.startsWith('rooms/'+code+'/')));if(v)out[code]=v;}}return out;}
+const exact=await dbRows(path,false);if(!Array.isArray(exact))return null;const desc=await dbRows(path,true);if(!Array.isArray(desc))return null;const all=[...exact,...desc].filter(r=>r&&typeof r.path==='string'&&(r.path===path||r.path.startsWith(path+'/')));return buildTree(path,all);}
+async function writeNode(path,value){const url=dbTable()+'?on_conflict=path';const result=await dbFetch(url,{method:'POST',headers:dbHeaders({'Prefer':'resolution=merge-duplicates,return=representation'}),body:JSON.stringify({path,value,updated_at:new Date().toISOString()})});return result===null?null:value;}
+async function removeRows(path,descendants=true){const params=new URLSearchParams();params.set('path',descendants?'like.'+path.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'/*':'eq.'+path);const result=await dbFetch(dbTable()+'?'+params.toString(),{method:'DELETE',headers:dbHeaders({'Prefer':'return=minimal'})});return result!==null;}
+async function dbPut(path,value){if(!dbConfigured())return null;path=String(path||'').replace(/^\/+|\/+$/g,'');if(!path||!(path.startsWith('lb/')||path.startsWith('rooms/')))return null;await removeRows(path,true);if(path.startsWith('rooms/')&&path.split('/').length===2&&value&&typeof value==='object'&&value.players&&typeof value.players==='object'){const base={...value};delete base.players;const saved=await writeNode(path,base);if(saved===null)return null;for(const [id,player] of Object.entries(value.players).slice(0,10)){if(await writeNode(path+'/players/'+id,player)===null)return null;}return value;}return await writeNode(path,value);}
+async function dbPatch(path,obj){if(!dbConfigured()||!obj||typeof obj!=='object')return null;const current=await dbGet(path);if(current===null||typeof current!=='object'||Array.isArray(current))return null;const next={...current,...obj};if(path.startsWith('rooms/')&&path.split('/').length===2)delete next.players;return await writeNode(path,next);}
+async function dbPush(path,value){if(!dbConfigured())return null;let id='';for(let i=0;i<20;i++){id=Array.from({length:12},()=> 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.random()*62|0]).join('');if(await dbGet(path+'/'+id)===null)break;}const saved=await dbPut(path+'/'+id,value);return saved===null?null:{name:id};}
+async function dbDelete(path){if(!dbConfigured())return false;path=String(path||'').replace(/^\/+|\/+$/g,'');if(!path||!(path.startsWith('lb/')||path.startsWith('rooms/')))return false;const exact=await dbFetch(dbTable()+'?'+new URLSearchParams({path:'eq.'+path}),{method:'DELETE',headers:dbHeaders({'Prefer':'return=minimal'})});const descendants=await dbFetch(dbTable()+'?'+new URLSearchParams({path:'like.'+path+'/*'}),{method:'DELETE',headers:dbHeaders({'Prefer':'return=minimal'})});return exact!==null||descendants!==null;}
+function dbListen(path,onEvent){let stopped=false,timer=0,polling=false,last='';const poll=async()=>{if(stopped||polling)return;polling=true;const value=await dbGet(path);if(value!==null){let signature='';try{signature=JSON.stringify(value);}catch(_){}if(signature!==last){last=signature;try{onEvent(value);}catch(_){}}}polling=false;if(!stopped)timer=setTimeout(poll,1500);};poll();return ()=>{stopped=true;clearTimeout(timer);};}
+async function getServerTime(){if(!dbConfigured())return null;const value=await dbFetch(dbBase()+'/rest/v1/rpc/server_timestamp_ms',{method:'POST',headers:dbHeaders(),body:'{}'});return typeof value==='number'&&Number.isFinite(value)?value:null;}
+function nowSrv(){return Date.now()+serverOffset;}
+async function ensureServerTime(){if(serverTimeReady)return true;if(!dbConfigured())return false;const n=await getServerTime();if(typeof n==='number'){serverOffset=n-Date.now();serverTimeReady=true;return true;}return false;}
+function onlineEnabled(){return dbConfigured()&&onlineReachable;}
+async function probeOnline(){if(!dbConfigured()){onlineReachable=false;onlineNote=ONLINE_OFFLINE_NOTE;return false;}const n=await getServerTime();onlineReachable=typeof n==='number';if(onlineReachable){serverOffset=n-Date.now();serverTimeReady=true;}onlineNote=onlineReachable?'':'Không kết nối được máy chủ. Chế độ chơi đơn vẫn hoạt động.';return onlineReachable;}
+function randomRoomCode(){let c='';for(let i=0;i<4;i++)c+=ONLINE_ALPHABET[Math.random()*ONLINE_ALPHABET.length|0];return c;}
+function sanitizeRoom(r){if(!r||typeof r!=='object'||!r.players||typeof r.players!=='object')return null;const out={host:safeText(r.host,8),level:clamp(r.level|0,0,8),seed:Number(r.seed)>>>0,status:['lobby','playing','done'].includes(r.status)?r.status:'lobby',created:Number(r.created)||0,startAt:Number(r.startAt)||0,players:{}};for(const [id,p] of Object.entries(r.players).slice(0,10)){if(!/^[A-Za-z0-9]{8}$/.test(id)||!p||typeof p!=='object')continue;out.players[id]={n:safeText(p.n,12)||'Khach',c:clamp(Number(p.c)||0,0,9),joined:Number(p.joined)||0,ready:!!p.ready,last:Number(p.last)||0,finishedAt:Number(p.finishedAt)||0,p:p.p&&typeof p.p==='object'?{s:clamp(Number(p.p.s)||0,0,9999),a:clamp(Number(p.p.a)||0,0,64),x:p.p.x?1:0}:null,done:p.done?1:0,score:clamp(Number(p.score)||0,0,9999)};}return out;}
+function activePlayers(r=roomData){if(!r)return [];const now=nowSrv();return Object.entries(r.players||{}).map(([id,p])=>({id,...p,connected:now-(Number(p.last)||0)<=20000})).filter(p=>p.connected).sort((a,b)=>a.joined-b.joined).slice(0,10);}
+function currentStars(){const c=counts(),g=LEVELS[lvl]?.g||{p:10,h:2,c:0};let stars=1;if(c.p>=g.p+2&&c.h>=g.h+2&&c.c>=g.c+2)stars=2;if(stars===2&&!tiles.some(t=>t.des))stars=3;return stars;}
+function scoreBreakdown(){const c=counts(),remaining=Math.max(0,DUR-ticks*TICK),stars=currentStars(),desert=tiles.some(t=>t.des),parts={stars:stars*1000,time:Math.round(remaining)*10,plants:c.p*20,herbivores:c.h*30,carnivores:c.c*50,o2:Math.round(o2),desert:desert?0:300};const total=Math.min(9999,Object.values(parts).reduce((a,b)=>a+b,0));return {total,parts,counts:c,remaining,stars,desert};}
+function roomPath(suffix=''){return 'rooms/'+roomCode+(suffix?'/'+suffix.replace(/^\//,''):'');}
+function playerPath(suffix=''){return roomPath('players/'+playerId+(suffix?'/'+suffix:''));}
+async function setPlayerName(v){const n=safeText(v,12);playerName=n||('Khach'+String(100+Math.floor(Math.random()*900)));try{localStorage.setItem('pg_online_name',playerName);}catch(_){}return playerName;}
+function showTextInput(purpose,value,maxLength=12){inputPurpose=purpose;inputValue=value||'';if(!inputOverlay){inputOverlay=document.createElement('input');inputOverlay.type='text';inputOverlay.autocomplete='off';inputOverlay.autocapitalize='off';inputOverlay.spellcheck=false;inputOverlay.style.cssText='position:fixed;z-index:20;display:none;box-sizing:border-box;padding:12px 14px;border:1px solid #66d9a5;border-radius:12px;background:#0b1822;color:#e9fff2;font-family:'+FONT_STACK+';font-size:16px;outline:none;';document.body.appendChild(inputOverlay);inputOverlay.addEventListener('input',()=>{inputOverlay.value=inputPurpose==='roomcode'?inputOverlay.value.toUpperCase().replace(/[^23456789ABCDEFGHJKLMNPQRSTUVWXYZ]/g,'').slice(0,4):safeText(inputOverlay.value,12);});inputOverlay.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();confirmTextInput();}if(e.key==='Escape'){e.preventDefault();e.stopPropagation();hideTextInput();state='online';stateT=0;}});}inputOverlay.maxLength=maxLength;inputOverlay.value=inputValue;inputOverlay.style.display='block';positionTextInput();setTimeout(()=>{try{inputOverlay.focus();inputOverlay.select();}catch(_){}},0);}
+function positionTextInput(){if(!inputOverlay||inputOverlay.style.display==='none')return;const w=Math.min(W*.72,360),x=(gameOffset+(W-w)/2),y=H*.49;inputOverlay.style.left=x+'px';inputOverlay.style.top=y+'px';inputOverlay.style.width=w+'px';inputOverlay.style.height='50px';}
+function hideTextInput(){if(inputOverlay){inputOverlay.style.display='none';try{inputOverlay.blur();}catch(_){}}inputPurpose='';}
+async function confirmTextInput(){const v=inputOverlay?inputOverlay.value:inputValue,purpose=inputPurpose;hideTextInput();if(purpose==='name'){await setPlayerName(v);state='online';}else if(purpose==='roomcode'){await joinRoom(v.toUpperCase());}stateT=0;}
+async function submitLeaderboard(){if(!dbBase()||!onlineScorePayload)return false;if(!onlineReachable&&!await probeOnline()){onlineScoreRetry=true;return false;}if(onlineScoreSent&&!onlineScoreRetry)return true;onlineScoreSent=false;onlineScoreRetry=false;const v=await dbPush('lb/'+lvl,onlineScorePayload);if(v&&typeof v.name==='string'){onlineScoreKey=v.name;onlineScoreSent=true;return true;}onlineScoreRetry=true;return false;}
+async function openLeaderboard(level=lbLevel){if(state!=='leaderboard')lbReturnState=state==='select'?'select':state==='menu'?'menu':'online';lbLevel=clamp(level|0,0,11);state='leaderboard';stateT=0;lbError='';if(dbBase()&&!onlineReachable)await probeOnline();const age=Date.now()-(lbCacheAt[lbLevel]||0);if(lbCache[lbLevel]&&age<30000){lbRows=lbCache[lbLevel];lbLoading=false;return;}lbLoading=true;const data=await dbGet('lb/'+lbLevel,'orderBy="s"&limitToLast=10');if(data===null){lbRows=[];lbError='Không tải được bảng xếp hạng.';}else{lbRows=Object.entries(data).map(([id,v])=>({id,n:safeText(v&&v.n,12)||'Khach',s:clamp(Number(v&&v.s)||0,0,9999),t:Number(v&&v.t)||0})).sort((a,b)=>b.s-a.s||a.t-b.t).slice(0,10);lbCache[lbLevel]=lbRows;lbCacheAt[lbLevel]=Date.now();}lbLoading=false;}
+async function refreshLeaderboard(){lbCacheAt[lbLevel]=0;await openLeaderboard(lbLevel);}
+async function createRoom(){if(!onlineEnabled()){onlineNote=ONLINE_OFFLINE_NOTE;return;}if(!await ensureServerTime()){onlineNote='Không đồng bộ được thời gian máy chủ.';return;}for(let i=0;i<12;i++){const code=randomRoomCode();const exists=await dbGet('rooms/'+code);if(!onlineReachable){roomCode='';roomData=null;onlineNote=ONLINE_OFFLINE_NOTE;return;}if(exists!==null)continue;roomCode=code;const now=nowSrv();roomData={host:playerId,level:Math.min(lvl,8),seed:0,status:'lobby',created:now,startAt:0,players:{}};roomData.players[playerId]={n:playerName,c:playerColor,joined:now,ready:true,last:now,p:{s:0,a:0,x:0},done:0,score:0};const ok=await dbPut(roomPath(),roomData);if(ok!==null){await cleanupStaleRooms();enterRoom();sfx.pop();return;}roomData=null;}onlineNote='Không tạo được phòng. Thử lại.';}
+async function cleanupStaleRooms(){const all=await dbGet('rooms');if(!all||typeof all!=='object')return;const now=nowSrv();for(const [code,r] of Object.entries(all)){if(code===roomCode||!r||!r.players||!r.players[playerId])continue;if(now-(Number(r.created)||now)>7200000)await dbDelete('rooms/'+code);}}
+async function joinRoom(code){if(!onlineEnabled()){onlineNote=ONLINE_OFFLINE_NOTE;state='online';return;}if(!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/.test(code)){onlineNote='Mã phòng không hợp lệ.';state='online';return;}if(!await ensureServerTime()){onlineNote='Không đồng bộ được thời gian máy chủ.';state='online';return;}const raw=await dbGet('rooms/'+code);if(!onlineReachable){onlineNote=ONLINE_OFFLINE_NOTE;state='online';return;}const r=sanitizeRoom(raw);if(!r){onlineNote='Không tìm thấy phòng.';state='online';return;}if(r.status==='playing'){onlineNote='Phòng đang thi đấu.';state='online';return;}if(r.status!=='lobby'){onlineNote='Phòng đã kết thúc.';state='online';return;}const active=activePlayers(r);if(active.filter(p=>p.id!==playerId).length>=10){onlineNote='Phòng đầy.';state='online';return;}roomCode=code;roomData=r;const now=nowSrv();const me=r.players[playerId]||{n:playerName,c:playerColor,joined:now,ready:false,last:now,p:{s:0,a:0,x:0},done:0,score:0};me.n=playerName;me.c=playerColor;me.last=now;me.joined=me.joined||now;r.players[playerId]=me;const ok=await dbPut('rooms/'+code+'/players/'+playerId,me);if(ok!==null){enterRoom();sfx.pop();}else{roomCode='';roomData=null;onlineNote='Không thể vào phòng.';state='online';}}
+function enterRoom(){if(roomStop)roomStop();clearInterval(roomHeartbeat);clearInterval(roomRankTimer);roomUnsubscribed=false;roomResultsShown=false;roomStartHandled=false;onlineNote='';state='lobby';stateT=0;roomStop=dbListen(roomPath(),v=>{const r=sanitizeRoom(v);if(!r){roomData=null;return;}roomData=r;if(r.status==='playing'&&!roomStartHandled){roomStartHandled=true;const wait=Math.max(0,r.startAt-nowSrv());raceCountdown=wait/1000;state='racecount';stateT=0;}if(r.status==='done'&&state!=='raceresults'){state='raceresults';stateT=0;const rank=Object.entries(r.players||{}).filter(([id,p])=>nowSrv()-(Number(p.last)||0)<=20000).sort((a,b)=>(Number(b[1].score)||0)-(Number(a[1].score)||0));if(rank[0]&&rank[0][0]===playerId){confettiUntil=performance.now()+2200;sfx.win();}else confettiUntil=0;}if(r.status==='lobby'){roomStartHandled=false;if(state==='raceresults'){state='lobby';stateT=0;}}});roomHeartbeat=setInterval(async()=>{if(!roomCode||roomUnsubscribed)return;const now=nowSrv();lastRoomHeartbeatAt=now;await dbPatch(playerPath(),{last:now});await maintainHost();},5000);roomRankTimer=setInterval(async()=>{if(!roomCode||roomUnsubscribed||!roomData||roomData.status!=='playing')return;if(state==='play'){const b=scoreBreakdown();await dbPatch(playerPath(),{p:{s:b.total,a:b.counts.p,x:collapsed?1:0}});lastRoomProgressAt=nowSrv();}await checkRaceFinish(false);},1000);}
+async function maintainHost(){const r=sanitizeRoom(await dbGet(roomPath()));if(!r)return;const now=nowSrv(),players=Object.entries(r.players||{}),host=r.players[r.host];if(host&&now-(Number(host.last)||0)>15000){const next=players.filter(([id,p])=>now-(Number(p.last)||0)<=20000).sort((a,b)=>(Number(a[1].joined)||0)-(Number(b[1].joined)||0))[0];if(next&&next[0]!==r.host)await dbPatch(roomPath(),{host:next[0]});}for(const [id,p] of players){if(now-(Number(p.last)||0)>20000&&p.ready)await dbPatch(roomPath('players/'+id),{ready:false});}const active=players.filter(([id,p])=>now-(Number(p.last)||0)<=20000);if(active.length===0)await dbDelete(roomPath());}
+async function toggleReady(){if(!roomData||!roomData.players[playerId])return;const ready=!roomData.players[playerId].ready;await dbPatch(playerPath(),{ready,last:nowSrv()});if(ready)sfx.codexChime();}
+async function startRace(){const r=sanitizeRoom(await dbGet(roomPath()));if(!r||r.host!==playerId)return;const active=activePlayers(r);if(active.length<2||active.some(p=>p.id!==r.host&&!p.ready))return;const seed=(Math.random()*4294967296)>>>0;const startAt=nowSrv()+4000;await dbPatch(roomPath(),{seed,startAt,status:'playing',level:clamp(r.level,0,8)});}
+function beginRace(r){if(!r||r.status!=='playing'||(state==='play'&&raceSeed===(r.seed>>>0)))return;const wait=Math.max(0,r.startAt-nowSrv());if(wait>0){state='racecount';raceCountdown=wait/1000;return;}raceSeed=r.seed>>>0;lvl=clamp(r.level,0,8);roomStartHandled=true;raceFinishAt=0;firstFinisherAt=0;onlineScoreSent=false;onlineScorePayload=null;seedRandom(raceSeed);startLevel(lvl,false);seedRandom(raceSeed);}
+async function leaveRoom(){if(!roomCode)return;roomUnsubscribed=true;clearInterval(roomHeartbeat);clearInterval(roomRankTimer);if(roomStop){roomStop();roomStop=null;}const code=roomCode,r=sanitizeRoom(await dbGet('rooms/'+code));if(r){await dbDelete('rooms/'+code+'/players/'+playerId);const left=await dbGet('rooms/'+code+'/players');const activeLeft=Object.entries(left||{}).filter(([id,p])=>nowSrv()-(Number(p.last)||0)<=20000).sort((a,b)=>(Number(a[1].joined)||0)-(Number(b[1].joined)||0));if(!activeLeft.length)await dbDelete('rooms/'+code);else if(r.host===playerId)await dbPatch('rooms/'+code,{host:activeLeft[0][0]});}roomCode='';roomData=null;roomResultsShown=false;state='online';stateT=0;}
+async function returnRoomToLobby(){if(!roomData||roomData.host!==playerId)return;const players={};for(const p of activePlayers())players[p.id]={n:p.n,c:p.c,joined:p.joined,ready:p.id===playerId,last:p.last,p:{s:0,a:0,x:0},done:0,score:0};await dbPatch(roomPath(),{status:'lobby',startAt:0,players});}
+async function checkRaceFinish(force){if(!roomData||!roomCode||roomData.status!=='playing')return;const me=roomData.players[playerId];if(!me)return;const elapsed=ticks*TICK;const ended=force||state==='collapse'||state==='lose'||state==='win'||elapsed>=DUR;if(ended&&!me.done){const score=state==='win'?scoreBreakdown().total:0;await dbPatch(playerPath(),{done:1,score,finishedAt:nowSrv(),last:nowSrv()});raceFinishAt=nowSrv();if(!firstFinisherAt)firstFinisherAt=raceFinishAt;}const fresh=sanitizeRoom(await dbGet(roomPath()));if(!fresh)return;roomData=fresh;const active=activePlayers(fresh);const allDone=active.length>0&&active.every(p=>p.done);const first=active.filter(p=>p.done).reduce((n,p)=>Math.min(n,p.finishedAt||p.last||nowSrv()),Infinity);if(allDone||(Number.isFinite(first)&&nowSrv()-first>=8000)){await dbPatch(roomPath(),{status:'done'});}}
+function drawRaceHud(){if(!roomCode||!roomData||roomData.status!=='playing')return;const ps=activePlayers().sort((a,b)=>(b.p?.s||0)-(a.p?.s||0));const my=ps.findIndex(p=>p.id===playerId)+1;const top=ps.slice(0,3);rr(ctx,8*S,8*S,Math.min(W-16*S,178*S),Math.max(54*S,top.length*17*S+27*S),10*S);ctx.fillStyle='rgba(4,14,20,.78)';ctx.fill();txt('THI ĐẤU  ·  Hạng '+(my||'—')+'/'+ps.length,16*S,25*S,11*S,'#bfffd0','left','800');top.forEach((p,i)=>txt((i+1)+'. '+safeText(p.n,12)+'  '+(p.p?.s||0),16*S,43*S+i*16*S,10*S,p.id===playerId?'#ffe28a':'#e6f1f5','left','600'));button('Rời phòng',W-45*S,H*.08,82*S,40*S,()=>leaveRoom(),'#ffd36b');}
+
 // ---------- Ecosystem & Chemistry Simulation ----------
 function hotspot(t){
  const f=s2,r=3-1.8*f,peak=.6+.9*f;
@@ -322,7 +392,7 @@ function lightAt(h,x,y){
 }
 
 function startLevel(i, sandbox=false){
- isSandbox=sandbox;lvl=clamp(i,0,11);const L=LEVELS[lvl]||LEVELS[0];
+ isSandbox=sandbox;lvl=clamp(i,0,11);if(roomCode&&roomData&&roomData.status==='playing'&&raceSeed!==null)seedRandom(raceSeed);else{raceSeed=null;seedRandom((Math.random()*4294967296)>>>0);onlineScorePayload=null;onlineScoreSent=false;onlineScoreRetry=false;}const L=LEVELS[lvl]||LEVELS[0];
  tiles=[];
  for(let k=0;k<64;k++){
   let isLime = false;
@@ -347,7 +417,7 @@ function nearest(a,list){let b=null,bd=1e9;for(const o of list){const d=Math.abs
 function stepToward(a,tx,ty){
  const dx=tx-a.x,dy=ty-a.y;if(!dx&&!dy)return;
  const ax=Math.abs(dx),ay=Math.abs(dy);
- if(ax>ay||(ax===ay&&Math.random()<.5))a.x+=Math.sign(dx);else a.y+=Math.sign(dy);
+ if(ax>ay||(ax===ay&&rand()<.5))a.x+=Math.sign(dx);else a.y+=Math.sign(dy);
  a.x=clamp(a.x,0,N-1); a.y=clamp(a.y,0,N-1);
 }
 function wander(a){
@@ -357,7 +427,7 @@ function wander(a){
 function mk(x,y,e){return {x:clamp(x,0,7),y:clamp(y,0,7),fx:x,fy:y,e:clamp(e,0,100),age:0,a:1,dead:false,scaleAnim:1.4,blinkT:0,eyeDir:{x:0,y:0}};}
 
 function triggerLightning(){
- const cx=(Math.random()*N)|0, cy=(Math.random()*N)|0;
+ const cx=(rand()*N)|0, cy=(rand()*N)|0;
  flash=0.6; shakeT=0.3;vibrate(120);
  sfx.crackle(); sfx.thunder();
  for(let dy=-1;dy<=1;dy++){
@@ -442,7 +512,7 @@ function tick(){
   flareTimer += TICK;
   if(!flareActive && !flareWarn && flareTimer>=7){
    flareWarn=true;
-   flarePos={x:1+((Math.random()*(N-2))|0), y:1+((Math.random()*(N-2))|0)};
+   flarePos={x:1+((rand()*(N-2))|0), y:1+((rand()*(N-2))|0)};
   }
   if(flareWarn && flareTimer>=8){
    flareWarn=false;
@@ -523,7 +593,7 @@ function tick(){
 
  for(let i=0;i<64;i++){
   const t=tiles[i];
-  if(!t.des&&!t.frozen&&t.P>70&&Math.random()<.03){
+  if(!t.des&&!t.frozen&&t.P>70&&rand()<.03){
    const x=i%N,y=(i/N)|0,nb=[];
    for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){
     const X=x+d[0],Y=y+d[1];
@@ -536,7 +606,7 @@ function tick(){
  if(vapor>30&&avg<.35){
   vapor=Math.max(0,vapor-3);
   for(let k=0;k<3;k++){
-   const j=(Math.random()*64)|0;
+   const j=(rand()*64)|0;
    if(!tiles[j].des&&!tiles[j].frozen){
     tiles[j].W=Math.min(100,tiles[j].W+8);
     if(hasChem && volcanoActive){
@@ -575,7 +645,7 @@ function tick(){
 
  if(evap.length){
   sfx.sizzle();
-  for(let k=0;k<Math.min(5,evap.length);k++){const i=pick(evap);steam(i%N,(i/N)|0,false);}
+  for(let k=0;k<Math.min(5,evap.length);k++){const i=pickVisual(evap);steam(i%N,(i/N)|0,false);}
  }
  for(const i of popList){
   const [sx,sy]=proj(i%N,(i/N)|0);
@@ -614,7 +684,7 @@ function tick(){
     }else wander(a);
     const t=tiles[a.y*N+a.x];
     if(t&&!t.des&&!t.frozen&&t.P>=15){t.P=Math.max(0,t.P-15);a.e=Math.min(100,a.e+20);unlockFormula(11);}
-   }else if(Math.random()<.4)wander(a);
+   }else if(rand()<.4)wander(a);
   }
   if(a.e>85&&herbs.length+bornH.length<6){
    a.e-=35;const c=mk(a.x,a.y,50);bornH.push(c);sfx.chirpH();popAt(a.x,a.y);vibrate(30);
@@ -636,7 +706,7 @@ function tick(){
     stepToward(a,tg.x,tg.y);
     a.eyeDir={x:Math.sign(tg.x-a.x), y:Math.sign(tg.y-a.y)};
     if(a.x===tg.x&&a.y===tg.y){tg.dead=true;deathPuff(tg.fx,tg.fy);a.e=Math.min(100,a.e+40);sfx.chirpC();unlockFormula(12);}
-   }else if(!tg||Math.random()<.4)wander(a);
+   }else if(!tg||rand()<.4)wander(a);
   }
   if(a.e>85&&carns.length+bornC.length<3){
    a.e-=35;bornC.push(mk(a.x,a.y,50));sfx.chirpC();popAt(a.x,a.y);vibrate(30);
@@ -696,12 +766,13 @@ function finish(){
    regretCardsUnlocked.push(lvl);
    saveStore('p_regret', regretCardsUnlocked);
   }
+  if(roomCode&&roomData&&roomData.status==='playing'){checkRaceFinish(true);}else if(dbBase()){const b=scoreBreakdown();onlineScorePayload={n:playerName,s:b.total,t:nowSrv()};onlineScoreSent=false;onlineScoreRetry=false;submitLeaderboard();}
  }
- else{state='lose';loseMsg=pick(LOSE_TIME);}
+ else{state='lose';loseMsg=pickVisual(LOSE_TIME);if(roomCode&&roomData&&roomData.status==='playing')checkRaceFinish(true);}
 }
 
 function triggerCollapse(h){
- state='collapse';cT=0;shakeT=.6;flash=1;collapsed=true;cOrig={x:h.x,y:h.y};sfx.boom();vibrate(400);
+ state='collapse';cT=0;shakeT=.6;flash=1;collapsed=true;cOrig={x:h.x,y:h.y};sfx.boom();vibrate(400);if(roomCode&&roomData&&roomData.status==='playing')checkRaceFinish(true);
  for(let i=0;i<60;i++)steam(Math.random()*7,Math.random()*7,true);
  for(let i=0;i<64;i++){
   const x=i%N,y=(i/N)|0,d=Math.hypot(x-h.x,y-h.y);
@@ -926,8 +997,7 @@ function buildTileSprites(){
 
   sCtx.strokeStyle='rgba(255,255,255,0.25)'; sCtx.lineWidth=1; sCtx.stroke();
 
-  if(type==='des'){
-   sCtx.strokeStyle='rgba(90,70,50,0.35)'; sCtx.lineWidth=1;
+  if(type==='des'){   sCtx.strokeStyle='rgba(90,70,50,0.35)'; sCtx.lineWidth=1;
    sCtx.beginPath(); sCtx.moveTo(cx-hw*0.3, cy-hh*0.2); sCtx.lineTo(cx, cy); sCtx.lineTo(cx+hw*0.2, cy+hh*0.4); sCtx.stroke();
   }
 
@@ -1539,9 +1609,11 @@ function drawOverlay(){
   button('Bắt đầu',cx,H*.64,200*S*pulse,50*S*pulse,()=>state='select');
   button('Phòng thí nghiệm',cx,H*.73,200*S,42*S,()=>startLevel(0, true),'#7fe3a0');
   button('Sổ công thức',cx,H*.82,200*S,40*S,()=>codexOpen=true,'#b08af0');
+  button('Thi đấu trực tuyến',cx,H*.89,200*S,38*S,()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;},onlineEnabled()?'#6fd68a':'#53636d');ctx.fillStyle=onlineEnabled()?'#42d987':'#6b7a82';circ(ctx,cx-88*S,H*.89,4*S);button('Bảng xếp hạng',cx,H*.96,170*S,34*S,()=>{if(onlineEnabled())openLeaderboard(0);else{state='online';onlineNote=ONLINE_OFFLINE_NOTE;}},onlineEnabled()?'#8ecbff':'#53636d');
  }else if(state==='select'){
   drawLevelSelect();
-  button('Quay lại',cx,H*.94,120*S,32*S,()=>state='menu','#ffd36b');
+  button('Bảng xếp hạng',cx-75*S,H*.94,145*S,38*S,()=>openLeaderboard(0),'#7fe3a0');
+ button('Quay lại',cx+75*S,H*.94,120*S,38*S,()=>state='menu','#ffd36b');
  }else if(state==='win'){
   txt('Hành tinh đã xanh!',cx,cy-20*S,28*S,'#bfffd0','center','800');
   txt(WIN_MSG[lvl]||WIN_MSG[0],cx,cy+18*S,14*S,'rgba(255,255,255,.9)','center','500');
@@ -1551,11 +1623,48 @@ function drawOverlay(){
   for(let k=0;k<3;k++) stStr += (k < st ? '*' : '-');
   txt(stStr, cx, cy+48*S, 28*S, '#ffe28a', 'center', '700');
   txt('Đã mở khóa Thẻ Hối Hận Sinh Thái #' + (lvl+1), cx, cy+75*S, 12*S, '#7fe3a0', 'center', '600');
+  const sb=scoreBreakdown(),detail='Điểm '+sb.total+' · Sao '+sb.stars*1000+' + TG '+Math.round(sb.remaining)*10+' + Cây '+sb.counts.p*20+' + Cỏ '+sb.counts.h*30+' + Thịt '+sb.counts.c*50+' + O₂ '+Math.round(o2)+' + Đất '+(sb.desert?0:300);const detailSize=Math.max(7,Math.min(10*S,(W-20*S)/(detail.length*.58)));txt(detail,cx,H*.60,detailSize,'#ffe28a','center','600');
+  if(onlineScoreRetry)button('Gửi điểm lại',cx,H*.84,150*S,38*S,()=>{onlineScoreRetry=false;submitLeaderboard();},'#7fe3a0');else if(onlineScorePayload&&!onlineScoreSent)txt('Đang gửi điểm…',cx,H*.84,11*S,'#bfffd0','center','600');
 
   if(lvl<11)button('Màn tiếp',cx-65*S,H*.68,120*S,46*S,()=>startLevel(lvl+1));
   else button('Chơi lại',cx-65*S,H*.68,120*S,46*S,()=>startLevel(0));
   button('Chọn màn',cx+65*S,H*.68,120*S,46*S,()=>state='select','#ffd36b');
   button('Lưu ảnh kỷ niệm',cx,H*.77,160*S,36*S,exportCanvasImage,'#7fe3a0');
+ }else if(state==='online'){
+  txt('Thi đấu trực tuyến',cx,cy-55*S,25*S,'#bfffd0','center','800');
+  txt('Người chơi: '+safeText(playerName,12),cx,cy-23*S,13*S,'#e6f1f5','center','600');
+  if(onlineNote||!onlineEnabled())txt(onlineNote||ONLINE_OFFLINE_NOTE,cx,cy+2*S,12*S,'#ffca6a','center','600');
+  const disabled=!onlineEnabled();
+  button('Đổi tên',cx,H*.48,170*S,42*S,()=>{state='name';stateT=0;showTextInput('name',playerName,12);},disabled?'#53636d':'#8ecbff');
+  button('Bảng xếp hạng',cx,H*.57,200*S,42*S,()=>openLeaderboard(0),disabled?'#53636d':'#6fd68a');
+  button('Tạo phòng',cx-90*S,H*.66,150*S,44*S,()=>createRoom(),disabled?'#53636d':'#6fd68a');
+  button('Vào phòng',cx+90*S,H*.66,150*S,44*S,()=>{state='roomcode';stateT=0;showTextInput('roomcode','',4);},disabled?'#53636d':'#8ecbff');
+  if(disabled){for(const b of btns.slice(-4)){b.fn=()=>{onlineNote=ONLINE_OFFLINE_NOTE;};}}
+  button('Quay lại',cx,H*.78,130*S,42*S,()=>{hideTextInput();state='menu';},'#ffd36b');
+ }else if(state==='name'||state==='roomcode'){
+  txt(state==='name'?'Đặt tên người chơi':'Nhập mã phòng',cx,cy-38*S,24*S,'#bfffd0','center','800');
+  txt(state==='name'?'Tối đa 12 ký tự':'Mã gồm 4 ký tự',cx,cy+3*S,13*S,'#e6f1f5','center','500');
+  button('Xác nhận',cx,H*.63,160*S,46*S,()=>confirmTextInput(),'#6fd68a');
+  button('Quay lại',cx,H*.73,130*S,42*S,()=>{hideTextInput();state='online';},'#ffd36b');
+ }else if(state==='leaderboard'){
+  txt('BẢNG XẾP HẠNG',cx,cy-65*S,23*S,'#bfffd0','center','800');
+  txt('Màn '+(lbLevel+1)+' · '+LEVELS[lbLevel].name,cx,cy-34*S,14*S,'#e6f1f5','center','600');
+  button('‹',cx-120*S,cy-34*S,42*S,42*S,()=>openLeaderboard((lbLevel+11)%12),'#8ecbff');button('›',cx+120*S,cy-34*S,42*S,42*S,()=>openLeaderboard((lbLevel+1)%12),'#8ecbff');
+  if(lbLoading)txt('Đang tải…',cx,cy+10*S,14*S,'#e6f1f5','center','600');else if(lbError)txt(lbError,cx,cy+10*S,12*S,'#ffb08a','center','600');else if(!lbRows.length)txt('Chưa có điểm cho màn này.',cx,cy+10*S,12*S,'#e6f1f5','center','500');
+  const rowY=cy+10*S;lbRows.slice(0,10).forEach((r,i)=>{const y=rowY+(i+1)*Math.min(24*S,H*.027);if(y>H*.80)return;rr(ctx,cx-145*S,y-11*S,290*S,22*S,6*S);ctx.fillStyle='rgba(102,217,165,'+(r.id===onlineScoreKey||r.n===playerName?0.16:0.06)+')';ctx.fill();txt((i+1)+'. '+safeText(r.n,12),cx-130*S,y+4*S,r.id===onlineScoreKey||r.n===playerName?11*S:11*S,r.id===onlineScoreKey||r.n===playerName?'#ffe28a':'#e6f1f5','left','600');txt(String(r.s),cx+130*S,y+4*S,11*S,'#bfffd0','right','800');});
+  button('Làm mới',cx-75*S,H*.86,130*S,42*S,()=>refreshLeaderboard(),'#6fd68a');button('Quay lại',cx+75*S,H*.86,130*S,42*S,()=>{state=lbReturnState;stateT=0;},'#ffd36b');
+ }else if(state==='lobby'){
+  const lobbyButtonStart=btns.length;const r=roomData||{host:playerId,level:0,players:{}};txt('PHÒNG THI ĐẤU',cx,cy-70*S,22*S,'#bfffd0','center','800');txt(roomCode,cx,cy-35*S,31*S,'#ffe28a','center','900');
+  button('Sao chép mã',cx,H*.22,145*S,38*S,async()=>{try{await navigator.clipboard.writeText(roomCode);onlineNote='Đã sao chép mã phòng.';}catch(_){onlineNote='Không thể sao chép tự động; hãy ghi lại mã.';}},'#8ecbff');
+  txt('Màn: '+(r.level+1)+' · '+LEVELS[clamp(r.level,0,8)].name,cx,H*.29,13*S,'#e6f1f5','center','600');
+  const ps=Object.entries(r.players||{}).slice(0,10).map(([id,p])=>({id,...p,connected:nowSrv()-(Number(p.last)||0)<=20000}));ps.slice(0,10).forEach((p,i)=>{const y=H*.34+i*Math.min(28*S,H*.035);circ(ctx,cx-125*S,y-3*S,5*S);ctx.fillStyle=PLAYER_COLORS[p.c]||PLAYER_COLORS[0];circ(ctx,cx-125*S,y-3*S,4*S);txt((p.id===r.host?'♛ ':'')+safeText(p.n,12)+(p.ready&&p.connected?' ✓':'')+(p.connected?'':' · mất kết nối'),cx-110*S,y+1*S,12*S,p.id===playerId?'#ffe28a':'#e6f1f5','left','600');});
+  if(playerId===r.host){button('Màn −',cx-90*S,H*.78,90*S,42*S,()=>dbPatch(roomPath(),{level:Math.max(0,r.level-1)}),'#8ecbff');button('Màn +',cx+90*S,H*.78,90*S,42*S,()=>dbPatch(roomPath(),{level:Math.min(8,r.level+1)}),'#8ecbff');const readyPlayers=ps.filter(p=>p.connected);const ready=readyPlayers.length>=2&&readyPlayers.every(p=>p.id===r.host||p.ready);button('Bắt đầu',cx,H*.86,160*S,44*S,()=>startRace(),ready?'#6fd68a':'#53636d');if(!ready&&btns.length)btns[btns.length-1].fn=()=>{};}else button(r.players[playerId]?.ready?'Đã sẵn sàng ✓':'Sẵn sàng',cx,H*.82,180*S,44*S,()=>toggleReady(),r.players[playerId]?.ready?'#6fd68a':'#8ecbff');
+  button('Rời phòng',cx,H*.94,140*S,42*S,()=>leaveRoom(),'#ffd36b');if(!onlineEnabled()){for(const b of btns.slice(lobbyButtonStart,-1))b.fn=()=>{onlineNote=ONLINE_OFFLINE_NOTE;};}if(onlineNote)txt(onlineNote,cx,H*.70,11*S,'#ffca6a','center','500');
+ }else if(state==='racecount'){
+  txt('Chuẩn bị thi đấu',cx,cy-35*S,22*S,'#bfffd0','center','800');txt(String(Math.min(3,Math.max(1,Math.ceil(raceCountdown)))),cx,cy+20*S,52*S,'#ffe28a','center','900');button('Rời phòng',cx,H*.72,140*S,42*S,()=>leaveRoom(),'#ffd36b');
+ }else if(state==='raceresults'){
+  if(performance.now()<confettiUntil&&!lowQualityMode){for(let i=0;i<18;i++){ctx.fillStyle=PLAYER_COLORS[i%PLAYER_COLORS.length];ctx.fillRect((i*83+tAll*37)%Math.max(1,W),(i*47+tAll*95)%Math.max(1,H),3*S,5*S);}}
+  txt('KẾT QUẢ THI ĐẤU',cx,cy-65*S,22*S,'#bfffd0','center','800');const ps=activePlayers().sort((a,b)=>(b.score||0)-(a.score||0));ps.slice(0,10).forEach((p,i)=>{const y=cy-25*S+i*25*S;if(i<3){ctx.fillStyle=['#ffe28a','#c9d3dc','#d99b65'][i];circ(ctx,cx-140*S,y-2*S,7*S);ctx.fillStyle='rgba(10,20,28,.9)';ctx.fillRect(cx-143*S,y+3*S,3*S,7*S);ctx.fillRect(cx-137*S,y+3*S,3*S,7*S);}txt((i+1)+'. '+safeText(p.n,12),cx-122*S,y+4*S,12*S,'#e6f1f5','left','600');txt(String(p.score||0),cx+130*S,y+4*S,12*S,'#ffe28a','right','800');});if(roomData&&roomData.host===playerId)button('Chơi lại',cx-75*S,H*.87,130*S,42*S,()=>{if(onlineEnabled())returnRoomToLobby();else onlineNote=ONLINE_OFFLINE_NOTE;},onlineEnabled()?'#6fd68a':'#53636d');button('Rời phòng',cx+75*S,H*.87,130*S,42*S,()=>leaveRoom(),'#ffd36b');
  }else if(state==='lose'){
   txt('Ôi không...',cx,cy-10*S,28*S,'#ffb08a','center','800');
   txt(loseMsg,cx,cy+28*S,14*S,'rgba(255,255,255,.9)','center','500');
@@ -1592,6 +1701,7 @@ cv.addEventListener('pointerdown',e=>{
  e.preventDefault();initAudio();
  const p=ptr(e),x=p[0],y=p[1];
  if(codexOpen){codexOpen=false;return;}if(minigameData)return;
+ if(state==='name'||state==='roomcode'){const target=hitButton(x,y);if(target){target.fn();}return;}
  const target=hitInputControl(x,y);
  if(target&&target.type==='button'){target.control.fn();return;}
  if(target&&target.type==='mute'){muted=!muted;saveStore('p_muted',muted);if(master&&AC)master.gain.setTargetAtTime(muted?0:.5,AC.currentTime,.02);return;}
@@ -1620,9 +1730,13 @@ function toggleFullscreen(){try{if(fullscreenElement()){(document.exitFullscreen
 const fsSupported=!!(cv.requestFullscreen||cv.webkitRequestFullscreen)&&!(/iPhone|iPad|iPod/.test(navigator.userAgent)&&!window.MSStream);
 document.addEventListener('keydown',e=>{
  const k=e.key.toLowerCase();
+ if(state==='name'||state==='roomcode'){if(k==='escape'){hideTextInput();state='online';stateT=0;}else if(k==='enter')confirmTextInput();return;}
+ if(state==='leaderboard'&&(k==='arrowleft'||k==='arrowright')){openLeaderboard((lbLevel+(k==='arrowleft'?11:1))%12);return;}
+ if(k==='escape'&&roomCode&&roomData&&roomData.status==='playing'){leaveRoom();return;}
+ if(k==='escape'&&['online','leaderboard','lobby','raceresults','racecount'].includes(state)){if(state==='lobby'||state==='raceresults')leaveRoom();else{state=state==='leaderboard'?lbReturnState:'menu';stateT=0;}return;}
  if(['arrowleft','arrowright','arrowup','arrowdown',' ','a','d','w','s'].includes(k))e.preventDefault();
- if(k===' '){if(!e.repeat)togglePause();return;}
- if(k==='r'){if(state==='play'||state==='paused'||state==='lose'||state==='win'||state==='collapse')startLevel(lvl,isSandbox);return;}
+ if(k===' '){if(roomCode&&roomData&&roomData.status==='playing')return;if(!e.repeat)togglePause();return;}
+ if(k==='r'){if(roomCode&&roomData&&roomData.status==='playing')return;if(state==='play'||state==='paused'||state==='lose'||state==='win'||state==='collapse')startLevel(lvl,isSandbox);return;}
  if(k==='m'){muted=!muted;saveStore('p_muted',muted);if(master&&AC)try{master.gain.setTargetAtTime(muted?0:.5,AC.currentTime,.02);}catch(_){}return;}
  if(k==='escape'){if(codexOpen)codexOpen=false;else if(minigameData)minigameData=null;else if(state==='play'||state==='paused')togglePause();else if(state==='select')state='menu';return;}
  if(k==='f'&&fsSupported){toggleFullscreen();return;}
@@ -1630,8 +1744,8 @@ document.addEventListener('keydown',e=>{
  if(['arrowleft','arrowright','arrowup','arrowdown','a','d','w','s'].includes(k))heldKeys.set(k,0);
 });
 document.addEventListener('keyup',e=>heldKeys.delete(e.key.toLowerCase()));
-window.addEventListener('blur',()=>{heldKeys.clear();if(state==='play'){pauseReturnState='play';state='paused';pauseReason='Đã tạm dừng khi mất tiêu điểm';}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){heldKeys.clear();if(state==='play'){pauseReturnState='play';state='paused';pauseReason='Đã tạm dừng khi chuyển tab';}}else if(AC&&AC.state==='suspended')try{AC.resume();}catch(_){}});
+window.addEventListener('blur',()=>{heldKeys.clear();if(state==='play'&&!(roomCode&&roomData&&roomData.status==='playing')){pauseReturnState='play';state='paused';pauseReason='Đã tạm dừng khi mất tiêu điểm';}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){heldKeys.clear();if(state==='play'&&!(roomCode&&roomData&&roomData.status==='playing')){pauseReturnState='play';state='paused';pauseReason='Đã tạm dừng khi chuyển tab';}}else if(AC&&AC.state==='suspended')try{AC.resume();}catch(_){}});
 ['pointerdown','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{if(AC&&AC.state==='suspended')try{AC.resume();}catch(_){}},{passive:true}));
 const hintDismissed=loadStore('p_keyhint_dismissed',false);
 let keyHintClosed=!!hintDismissed;
@@ -1678,11 +1792,13 @@ function frame(ts){
 
   photoT=Math.max(0,photoT-dt);photoCool=Math.max(0,photoCool-dt);rainT=Math.max(0,rainT-dt);
   flash=Math.max(0,flash-dt/.9);shakeT=Math.max(0,shakeT-dt);
+  if(state==='racecount'&&roomData&&roomData.status==='playing'){raceCountdown=Math.max(0,(roomData.startAt-nowSrv())/1000);if(raceCountdown<=0)beginRace(Object.assign({},roomData,{startAt:nowSrv()}));}
+  if(state==='play'&&roomCode&&roomData&&roomData.status==='playing'&&ticks*TICK>=DUR&&!raceFinishAt)checkRaceFinish(true);
   if(state==='play' && !isReplaying && !codexOpen && !minigameData){
    hintT+=dt;acc+=dt * (isSandbox ? simSpeed : 1);let n=0;
    while(acc>=TICK&&state==='play'&&n++<6){acc-=TICK;tick();}
    if(state!=='play')acc=0;
-   if(rainT>0&&Math.random()<dt*25){const j=(Math.random()*64)|0;spawnDrop(j%N,(j/N)|0);}
+   if(rainT>0&&rand()<dt*25){const j=(rand()*64)|0;spawnDrop(j%N,(j/N)|0);}
   }else if(state==='collapse'){
    cT+=dt;
    for(let i=embQ.length-1;i>=0;i--){
@@ -1697,9 +1813,9 @@ function frame(ts){
    if(cT>=1.5){
     if(isSandbox){
      startLevel(0, true);
-     loseMsg=pick(SANDBOX_RESET_MSG);
+     loseMsg=pickVisual(SANDBOX_RESET_MSG);
     } else {
-     state='lose';stateT=0;loseMsg=pick(LOSE_COL);
+     state='lose';stateT=0;loseMsg=pickVisual(LOSE_COL);
     }
    }
   }
@@ -1740,7 +1856,7 @@ function frame(ts){
   ctx.restore();
 
   if(flash>0){ctx.fillStyle='rgba(255,255,255,'+(flash*.65)+')';ctx.fillRect(0,0,W,H);}
-  if(textReady){drawHUD();drawControls();drawOverlay();drawKeyboardHints();
+  if(textReady){drawHUD();drawControls();if(roomCode&&roomData&&roomData.status==='playing'&&state==='play')drawRaceHud();drawOverlay();drawKeyboardHints();
     if(state==='paused'){ctx.fillStyle='rgba(3,8,14,.82)';ctx.fillRect(0,0,W,H);txt('Đã tạm dừng',W/2,H*.42,28*S,'#bfffd0','center','800');txt(pauseReason||'Nhấn Space để tiếp tục',W/2,H*.48,14*S,'#fff','center','500');button('Tiếp tục',W/2,H*.58,150*S,44*S,togglePause,'#7fe3a0');button('Chơi lại',W/2,H*.67,150*S,40*S,()=>startLevel(lvl,isSandbox),'#ffd36b');}
    }
 
@@ -1759,6 +1875,7 @@ window.addEventListener('resize',scheduleResize);window.addEventListener('orient
 if(window.visualViewport){window.visualViewport.addEventListener('resize',scheduleResize);window.visualViewport.addEventListener('scroll',()=>{canvasRect=cv.getBoundingClientRect();},{passive:true});}
 resize();
 state='menu';stateT=0;
+if(dbConfigured())probeOnline().then(()=>{});else{onlineReachable=false;onlineNote=ONLINE_OFFLINE_NOTE;}
 requestAnimationFrame(frame);
 })();
 </script>
