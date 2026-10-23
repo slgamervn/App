@@ -66,10 +66,13 @@ const SANDBOX_RESET_MSG=[
 function loadStore(k,def){try{const v=localStorage.getItem(k);return v!==null?JSON.parse(v):def;}catch(e){return def;}}
 function saveStore(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 
-let W=0,H=0,DPR=1,S=1,VIEWW=0,gameOffset=0;
+let W=0,H=0,DPR=1,S=1,VIEWW=0,gameOffset=0,canvasRect=null;
 let state='menu',stateT=0,lvl=0,loseMsg='',unlockedLvl=loadStore('p_unlocked',0),levelStars=loadStore('p_stars',[0,0,0,0,0,0,0,0,0,0,0,0]);
 let s1=0.5,s2=0.05;
-let tiles=[],herbs=[],carns=[],parts=[],embQ=[],btns=[];
+let tiles=[],herbs=[],carns=[],parts=[],embQ=[];
+const worldObjects=[];
+const controlLayout={sliders:[],buttons:[],mute:null};
+const btns=controlLayout.buttons;
 let ticks=0,acc=0,vapor=0,o2=0,co2=50,h2=0,rainT=0,photoT=0,photoCool=0,flash=0,shakeT=0,cT=0,tAll=0,hintT=0;
 let collapsed=false,cOrig={x:3.5,y:3.5},muted=loadStore('p_muted',false);
 let hs={x:3.5,y:3,r:2.5,peak:.8};
@@ -180,6 +183,7 @@ function vibrate(ms){if(!muted&&navigator.vibrate)try{navigator.vibrate(ms);}cat
 const lay={tw:40,th:20,ox:0,oy:0,cx:0,cy:0,hudH:134,top:134,bot:400};
 
 function resize(){
+ canvasRect=null;
  const vv=window.visualViewport;
  const vw=Math.max(1,Math.round(vv?vv.width:window.innerWidth));
  const vh=Math.max(1,Math.round(vv?vv.height:window.innerHeight));
@@ -192,6 +196,7 @@ function resize(){
  offBloomCv.width=Math.round(vw*DPR*0.25); offBloomCv.height=Math.round(H*DPR*0.25);
  terrainDirty=true;
  S=Math.max(.75,Math.min(1.3,Math.min(W,H)/390));
+ canvasRect=cv.getBoundingClientRect();
  const top=110*S,bot=H*0.72;
  const tw=Math.max(18,Math.min((W-24)/8,(bot-top-40)/4));
  lay.tw=tw;lay.th=tw/2;lay.top=top;lay.bot=bot;
@@ -1114,7 +1119,7 @@ function drawWorld(){
  if(isReplaying){ drawReplayWorld(); return; }
 
  const now = performance.now();
- if(terrainDirty || now - lastTerrainDraw > 200){
+ if(terrainDirty || (!drag && now - lastTerrainDraw > 200)){
   renderTerrainToBuffer();
   lastTerrainDraw = now;
  }
@@ -1160,15 +1165,14 @@ function drawWorld(){
   }
  }
 
- const objs=[];
+ let objCount=0;
  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
-  const t=tiles[y*N+x];if(t&&!t.des&&t.P>=8)objs.push({d:x+y,k:0,x:x,y:y,P:t.P,wv:t.wv,sc:t.scaleAnim||1});
+  const t=tiles[y*N+x];if(t&&!t.des&&t.P>=8){let o=worldObjects[objCount];if(!o)o=worldObjects[objCount]={};o.d=x+y;o.k=0;o.x=x;o.y=y;o.P=t.P;o.wv=t.wv;o.sc=t.scaleAnim||1;o.a=null;objCount++;}
  }
- for(const a of herbs)objs.push({d:a.fx+a.fy+.01,k:1,a:a,sc:a.scaleAnim||1});
- for(const a of carns)objs.push({d:a.fx+a.fy+.02,k:2,a:a,sc:a.scaleAnim||1});
- objs.sort((p,q)=>p.d-q.d);
-
- for(const o of objs){
+ for(const a of herbs){let o=worldObjects[objCount];if(!o)o=worldObjects[objCount]={};o.d=a.fx+a.fy+.01;o.k=1;o.a=a;o.sc=a.scaleAnim||1;objCount++;}
+ for(const a of carns){let o=worldObjects[objCount];if(!o)o=worldObjects[objCount]={};o.d=a.fx+a.fy+.02;o.k=2;o.a=a;o.sc=a.scaleAnim||1;objCount++;}
+ worldObjects.length=objCount;worldObjects.sort((p,q)=>p.d-q.d);
+ for(let oi=0;oi<objCount;oi++){const o=worldObjects[oi];
   if(o.k===0){const p=proj(o.x,o.y);drawPlant(p[0],p[1],o.P,o.wv,o.sc,o.x,o.y);}
   else{const p=proj(o.a.fx,o.a.fy);if(o.k===1)drawHerb(p[0],p[1],o.a,o.sc);else drawCarn(p[0],p[1],o.a,o.sc);}
  }
@@ -1305,18 +1309,31 @@ function drawHUD(){
 
 const sliderY=i=>H-(isSandbox?165*S:(LEVELS[lvl]&&LEVELS[lvl].chem?155*S:130*S))+i*55*S;
 
+function layoutControls(){
+ const x0=35*S,x1=W-35*S;
+ controlLayout.sliders.length=0;
+ for(let i=0;i<2;i++){
+  const y=sliderY(i),value=i===0?s1:s2;
+  const hitH=Math.max(48,48*S);
+  controlLayout.sliders.push({id:i,x0,x1,y,track:{x:x0-8*S,y:y-hitH/2,w:x1-x0+16*S,h:hitH},handleX:x0+value*(x1-x0),value});
+ }
+ controlLayout.mute={x:W-30*S,y:H-25*S,r:24*S};
+}
+
+let controlsGradient=null,controlsGradientKey='';
 function drawControls(){
- const pg=ctx.createLinearGradient(0,H*0.6,0,H);
- pg.addColorStop(0,'rgba(8,16,24,0)');pg.addColorStop(.35,'rgba(8,16,24,.65)');pg.addColorStop(1,'rgba(8,16,24,.9)');
+ layoutControls();
+ const gkey=W+'x'+H+'x'+S;
+ if(!controlsGradient||controlsGradientKey!==gkey){controlsGradient=ctx.createLinearGradient(0,H*0.6,0,H);controlsGradient.addColorStop(0,'rgba(8,16,24,0)');controlsGradient.addColorStop(.35,'rgba(8,16,24,.65)');controlsGradient.addColorStop(1,'rgba(8,16,24,.9)');controlsGradientKey=gkey;}
+ const pg=controlsGradient;
  ctx.fillStyle=pg;ctx.fillRect(0,H*0.6,W,H*0.4);
 
  const defs=[['Góc chiếu',s1,'#ffd36b'],['Tiêu cự',s2,'#ff9a5c']];
- const x0=35*S,x1=W-35*S;
  defs.forEach((d,i)=>{
-  const y=sliderY(i);
+  const sl=controlLayout.sliders[i],x0=sl.x0,x1=sl.x1,y=sl.y;
   txt(d[0],x0,y-16*S,13*S,'#fff','left','700');
   rr(ctx,x0,y-4*S,x1-x0,8*S,4);ctx.fillStyle='rgba(255,255,255,.18)';ctx.fill();
-  const kx=x0+d[1]*(x1-x0);
+  const kx=sl.handleX;
   rr(ctx,x0,y-4*S,kx-x0,8*S,4);ctx.fillStyle=d[2];ctx.fill();
   ctx.fillStyle='#fff';circ(ctx,kx,y,16*S);
   ctx.fillStyle=d[2];circ(ctx,kx,y,10*S);
@@ -1359,7 +1376,7 @@ function drawControls(){
   });
  }
 
- const mx=W-30*S,my=H-25*S;
+ const mx=controlLayout.mute.x,my=controlLayout.mute.y;
  ctx.fillStyle='rgba(255,255,255,.14)';circ(ctx,mx,my,20*S);
  ctx.fillStyle='#fff';
  ctx.beginPath();ctx.moveTo(mx-7*S,my-3*S);ctx.lineTo(mx-3*S,my-3*S);ctx.lineTo(mx+2*S,my-7*S);ctx.lineTo(mx+2*S,my+7*S);ctx.lineTo(mx-3*S,my+3*S);ctx.lineTo(mx-7*S,my+3*S);ctx.closePath();ctx.fill();
@@ -1374,8 +1391,9 @@ function drawControls(){
 
 function button(label,cx,cy,w,h,fn,col){
  const x=cx-w/2,y=cy-h/2;
- const hitMin=finePointer()?36:48,hitW=Math.max(w,hitMin),hitH=Math.max(h,hitMin);
-  btns.push({x:x-(hitW-w)/2,y:y-(hitH-h)/2,w:hitW,h:hitH,drawX:x,drawY:y,drawW:w,drawH:h,fn:fn});
+ const hitMin=finePointer()?36:48,hitW=Math.max(w,hitMin),hitH=Math.max(h,48);
+ const hit={x:x-(hitW-w)/2,y:y-(hitH-h)/2,w:hitW,h:hitH,drawX:x,drawY:y,drawW:w,drawH:h,fn:fn,label};
+ btns.push(hit);
  rr(ctx,x,y+3*S,w,h,h/2.4);ctx.fillStyle='rgba(0,0,0,.3)';ctx.fill();
  rr(ctx,x,y,w,h,h/2.4);ctx.fillStyle=col||'#6fd68a';ctx.fill();
   if(finePointer()&&hoverPoint&&hoverPoint.x>=x&&hoverPoint.x<=x+w&&hoverPoint.y>=y&&hoverPoint.y<=y+h){ctx.fillStyle='rgba(255,255,255,.13)';rr(ctx,x,y,w,h,h/2.4);ctx.fill();}
@@ -1558,45 +1576,38 @@ function drawOverlay(){
 }
 
 // ---------- Input Handling ----------
-let drag=null;const activeDrags=new Map();let hoverPoint=null;
-function ptr(e){const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*(VIEWW/r.width)-gameOffset,(e.clientY-r.top)*(H/r.height)];}
-function setSlider(i,x){const x0=35*S,x1=W-35*S;const v=clamp((x-x0)/(x1-x0),0,1);if(i===0){s1=v; unlockFormula(1);}else s2=v;}
+let drag=null, pendingSliderValue=null, hoverPoint=null;
+function ptr(e){if(!canvasRect)canvasRect=cv.getBoundingClientRect();const r=canvasRect;return [(e.clientX-r.left)*(VIEWW/r.width)-gameOffset,(e.clientY-r.top)*(H/r.height)];}
+function setSlider(i,x){const sl=controlLayout.sliders[i];if(!sl)return;const v=clamp((x-sl.x0)/(sl.x1-sl.x0),0,1);if(i===0){if(Math.abs(s1-v)>0.00001){s1=v;unlockFormula(1);}}else s2=v;}
+function hitButton(x,y){for(const b of btns)if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h)return b;return null;}
+function hitInputControl(x,y){
+ let best=null,bestScore=Infinity;
+ for(const sl of controlLayout.sliders){const r=sl.track;if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h){const score=Math.abs(y-sl.y);if(score<bestScore){best={type:'slider',control:sl};bestScore=score;}}}
+ for(const b of btns){if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){const score=Math.hypot(x-(b.x+b.w/2),y-(b.y+b.h/2));if(score<bestScore){best={type:'button',control:b};bestScore=score;}}}
+ const m=controlLayout.mute;if(m&&Math.hypot(x-m.x,y-m.y)<=m.r){const score=Math.hypot(x-m.x,y-m.y);if(score<bestScore)best={type:'mute',control:m};}
+ return best;
+}
 
 cv.addEventListener('pointerdown',e=>{
- e.preventDefault();
- initAudio();
+ e.preventDefault();initAudio();
  const p=ptr(e),x=p[0],y=p[1];
-
- if(codexOpen){codexOpen=false;return;}
- if(minigameData){return;}
-
- for(const b of btns){if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){b.fn();return;}}
- if(Math.hypot(x-(W-30*S),y-(H-25*S))<30*S){
-  muted=!muted; saveStore('p_muted', muted);
-  if(master&&AC)master.gain.setTargetAtTime(muted?0:.5,AC.currentTime,.02);return;
- }
+ if(codexOpen){codexOpen=false;return;}if(minigameData)return;
+ const target=hitInputControl(x,y);
+ if(target&&target.type==='button'){target.control.fn();return;}
+ if(target&&target.type==='mute'){muted=!muted;saveStore('p_muted',muted);if(master&&AC)master.gain.setTargetAtTime(muted?0:.5,AC.currentTime,.02);return;}
  if(state==='play'){
-  for(let i=0;i<2;i++){
-   if(Math.abs(y-sliderY(i))<28*S&&x>=15*S&&x<=W-15*S){
-    drag={i:i,id:e.pointerId};
-    try{cv.setPointerCapture(e.pointerId);}catch(_){}
-    setSlider(i,x);return;
-   }
-  }
-  const gridPos = unproj(x, y);
-  handleTileClick(gridPos[0], gridPos[1]);
+  if(target&&target.type==='slider'){const sl=target.control;drag={i:sl.id,id:e.pointerId,grabOffset:Math.abs(x-sl.handleX)<=24*S?x-sl.handleX:0};pendingSliderValue=clamp((x-drag.grabOffset-sl.x0)/(sl.x1-sl.x0),0,1);try{cv.setPointerCapture(e.pointerId);}catch(_){}return;}
+  const gridPos=unproj(x,y);handleTileClick(gridPos[0],gridPos[1]);
  }
 },{passive:false});
-cv.addEventListener('pointermove',e=>{const p=ptr(e);hoverPoint={x:p[0],y:p[1]};const d=activeDrags.get(e.pointerId);if(d){e.preventDefault();setSlider(d.i,p[0]);}else if(finePointer()){const onSlider=[0,1].some(i=>Math.abs(p[1]-sliderY(i))<28*S);const onButton=btns.some(b=>p[0]>=b.x&&p[0]<=b.x+b.w&&p[1]>=b.y&&p[1]<=b.y+b.h);cv.style.cursor=onSlider?'grab':onButton?'pointer':'default';}},{passive:false});
-const endDrag=e=>{
- if(drag&&e.pointerId===drag.id){
-  try{cv.releasePointerCapture(e.pointerId);}catch(_){}
-  drag=null;
- }
-};
-cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
+cv.addEventListener('pointermove',e=>{
+ if(drag&&e.pointerId===drag.id){e.preventDefault();const p=ptr(e),sl=controlLayout.sliders[drag.i];pendingSliderValue=clamp((p[0]-drag.grabOffset-sl.x0)/(sl.x1-sl.x0),0,1);return;}
+ if(finePointer()){const p=ptr(e);hoverPoint={x:p[0],y:p[1]};const sl=controlLayout.sliders.some(a=>p[0]>=a.track.x&&p[0]<=a.track.x+a.track.w&&p[1]>=a.track.y&&p[1]<=a.track.y+a.track.h);cv.style.cursor=sl?'grab':hitButton(p[0],p[1])?'pointer':'default';}
+},{passive:false});
+const endDrag=e=>{if(drag&&e.pointerId===drag.id){try{cv.releasePointerCapture(e.pointerId);}catch(_){}drag=null;pendingSliderValue=null;}};
+cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);cv.addEventListener('lostpointercapture',endDrag);
 cv.addEventListener('contextmenu',e=>e.preventDefault());
-cv.addEventListener('wheel',e=>{const p=ptr(e);for(let i=0;i<2;i++)if(Math.abs(p[1]-sliderY(i))<28*S){const x0=35*S,x1=W-35*S,v=i===0?s1:s2;setSlider(i,x0+v*(x1-x0)+Math.sign(e.deltaY)*8*S);e.preventDefault();break;}},{passive:false});
+cv.addEventListener('wheel',e=>{const p=ptr(e);for(const sl of controlLayout.sliders)if(p[0]>=sl.track.x&&p[0]<=sl.track.x+sl.track.w&&p[1]>=sl.track.y&&p[1]<=sl.track.y+sl.track.h){setSlider(sl.id,sl.x0+(sl.id===0?s1:s2)*(sl.x1-sl.x0)+Math.sign(e.deltaY)*8*S);e.preventDefault();break;}},{passive:false});
 for(const ev of ['touchmove','gesturestart','gesturechange','gestureend'])document.addEventListener(ev,e=>e.preventDefault(),{passive:false});
 
 
@@ -1634,7 +1645,7 @@ function drawKeyboardHints(){
 }
 
 // ---------- Main Game Loop ----------
-let last=0;
+let last=0,backgroundGradient=null,backgroundGradientKey='';
 function frame(ts){
  try{
   const dt=Math.min(.1,(ts-last)/1000||0);last=ts;
@@ -1647,6 +1658,8 @@ function frame(ts){
      if(key==='arrowdown'||key==='s')s2=clamp(s2-step,0,1);
     }
    }
+
+  if(pendingSliderValue!==null&&drag){const sl=controlLayout.sliders[drag.i];if(sl){const v=pendingSliderValue;pendingSliderValue=null;if(drag.i===0){if(Math.abs(s1-v)>0.00001){s1=v;unlockFormula(1);}}else s2=v;}}
 
   frameTimeHistory.push(dt);
   if(frameTimeHistory.length > 30){
@@ -1696,18 +1709,17 @@ function frame(ts){
   updParts(dt);
 
   ctx.setTransform(DPR,0,0,DPR,0,0);
-  btns.length=0;
+  btns.length=0;controlLayout.sliders.length=0;
 
-  const bg=ctx.createLinearGradient(0,0,0,H);
-  if(!isSandbox && LEVELS[lvl] && LEVELS[lvl].dn && state==='play'){
-   const dnK=dayNightFactor;
-   bg.addColorStop(0, rgb([10*dnK, 15*dnK, 28*dnK], 1));
-   bg.addColorStop(.55, rgb([18*dnK, 28*dnK, 45*dnK], 1));
-   bg.addColorStop(1, rgb([8*dnK, 12*dnK, 20*dnK], 1));
-  } else {
-   bg.addColorStop(0,'#060b11');bg.addColorStop(.55,'#122232');bg.addColorStop(1,'#081018');
+  const nightMode=!isSandbox&&LEVELS[lvl]&&LEVELS[lvl].dn&&state==='play';
+  const bgKey=W+'x'+H+'|'+(nightMode?Math.round(dayNightFactor*1000):'normal');
+  if(!backgroundGradient||backgroundGradientKey!==bgKey){
+   backgroundGradient=ctx.createLinearGradient(0,0,0,H);
+   if(nightMode){const dnK=dayNightFactor;backgroundGradient.addColorStop(0,rgb([10*dnK,15*dnK,28*dnK],1));backgroundGradient.addColorStop(.55,rgb([18*dnK,28*dnK,45*dnK],1));backgroundGradient.addColorStop(1,rgb([8*dnK,12*dnK,20*dnK],1));}
+   else{backgroundGradient.addColorStop(0,'#060b11');backgroundGradient.addColorStop(.55,'#122232');backgroundGradient.addColorStop(1,'#081018');}
+   backgroundGradientKey=bgKey;
   }
-  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=backgroundGradient;ctx.fillRect(0,0,W,H);
 
   ctx.fillStyle='rgba(255,255,255,0.25)';
   for(let i=0;i<25;i++){
@@ -1743,8 +1755,8 @@ function frame(ts){
 
 let resizeTimer=0;
 const scheduleResize=()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(resize,100);};
-window.addEventListener('resize',scheduleResize);window.addEventListener('orientationchange',scheduleResize);
-if(window.visualViewport)window.visualViewport.addEventListener('resize',scheduleResize);
+window.addEventListener('resize',scheduleResize);window.addEventListener('orientationchange',scheduleResize);window.addEventListener('scroll',()=>{canvasRect=cv.getBoundingClientRect();},{passive:true});
+if(window.visualViewport){window.visualViewport.addEventListener('resize',scheduleResize);window.visualViewport.addEventListener('scroll',()=>{canvasRect=cv.getBoundingClientRect();},{passive:true});}
 resize();
 state='menu';stateT=0;
 requestAnimationFrame(frame);
