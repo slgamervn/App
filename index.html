@@ -1532,17 +1532,33 @@ function drawMinigame(){
  txt(minigameData.eq.name, cx, H*0.36, 16*S, '#fff', 'center', '700');
  formulaText(minigameData.eq.q, cx, H*0.44, 18*S, '#8ef0a0', 'center', '700');
 
- // Coefficient controls buttons rendered dynamically or tap
- txt('Nhấn để tăng giảm hệ số (chưa hoàn thiện UI tương tác trực tiếp)', cx, H*0.56, 12*S, 'rgba(255,255,255,0.7)', 'center', '500');
-
+ // Hệ số tương tác trực tiếp: chạm dấu trừ/cộng để chỉnh từng hệ số.
+ let coefficientIndex=0;
+ const shown=minigameData.eq.q.replace(/__/g,()=>String(minigameData.vals[coefficientIndex++]));
+ formulaText(shown, cx, H*0.44, 18*S, '#8ef0a0', 'center', '700');
+ const count=minigameData.vals.length;
+ const gap=Math.min(62*S,(W*0.64)/Math.max(1,count));
+ const rowW=gap*count, startX=cx-rowW/2+gap/2;
+ for(let i=0;i<count;i++){
+  const x=startX+i*gap, y=H*0.53, w=gap*0.78, h=30*S;
+  rr(ctx,x-w/2,y-h/2,w,h,8*S);ctx.fillStyle='#223d52';ctx.fill();ctx.strokeStyle='#6bcf96';ctx.lineWidth=1;ctx.stroke();
+  txt('−',x-w*0.28,y+5*S,18*S,'#ffb0a8','center','800');
+  txt(String(minigameData.vals[i]),x,y+5*S,15*S,'#ffffff','center','800');
+  txt('+',x+w*0.28,y+5*S,18*S,'#9fffc0','center','800');
+ }
+ txt('Chạm − / + để chỉnh hệ số. Cần cân bằng đúng để nhận thưởng.',cx,H*0.59,11*S,'rgba(255,255,255,0.78)','center','500');
  button('Xác nhận & Vào màn', cx - 70*S, H*0.68, 130*S, 40*S, ()=>{
-  if(minigameData.onFinish) minigameData.onFinish();
-  minigameData = null;
+  const solved=minigameData.eq.ans.every((v,i)=>v===minigameData.vals[i]);
+  const finish=minigameData.onFinish;
+  if(solved&&minigameData.eq.reward==='lime')limeCharges=Math.min(9,limeCharges+1);
+  if(solved&&minigameData.eq.reward==='elec')elecCharges=Math.min(9,elecCharges+1);
+  if(!solved){toastMsg='Chưa cân bằng đúng — thử lại ở lần sau.';toastTimer=2.5;}
+  else{toastMsg='Chính xác! Nhận thêm tài nguyên.';toastTimer=2.5;}
+  if(finish)finish();
+  minigameData=null;
  }, '#7fe3a0');
-
  button('Bỏ qua', cx + 70*S, H*0.68, 100*S, 40*S, ()=>{
-  if(minigameData.onFinish) minigameData.onFinish();
-  minigameData = null;
+  const finish=minigameData.onFinish;if(finish)finish();minigameData=null;
  }, '#ff8a8a');
 }
 
@@ -1700,7 +1716,28 @@ function hitInputControl(x,y){
 cv.addEventListener('pointerdown',e=>{
  e.preventDefault();initAudio();
  const p=ptr(e),x=p[0],y=p[1];
- if(codexOpen){codexOpen=false;return;}if(minigameData)return;
+ if(codexOpen){codexOpen=false;return;}
+ if(minigameData){
+  const cx=W/2,count=minigameData.vals.length,gap=Math.min(62*S,(W*0.64)/Math.max(1,count)),rowW=gap*count,startX=cx-rowW/2+gap/2,y=H*0.53;
+  for(let i=0;i<count;i++){
+   const x=startX+i*gap,w=gap*0.78;
+   if(Math.abs(y-y)<1&&Math.abs(p[1]-y)<=19*S&&Math.abs(p[0]-x)<=w/2){
+    if(p[0]<x-w*0.08)minigameData.vals[i]=Math.max(1,minigameData.vals[i]-1);
+    else if(p[0]>x+w*0.08)minigameData.vals[i]=Math.min(12,minigameData.vals[i]+1);
+    return;
+   }
+  }
+  const confirmY=H*0.68;
+  if(Math.abs(p[1]-confirmY)<=24*S&&Math.abs(p[0]-(cx-70*S))<=72*S){
+   const solved=minigameData.eq.ans.every((v,i)=>v===minigameData.vals[i]),finish=minigameData.onFinish;
+   if(solved&&minigameData.eq.reward==='lime')limeCharges=Math.min(9,limeCharges+1);
+   if(solved&&minigameData.eq.reward==='elec')elecCharges=Math.min(9,elecCharges+1);
+   toastMsg=solved?'Chính xác! Nhận thêm tài nguyên.':'Chưa cân bằng đúng — thử lại ở lần sau.';toastTimer=2.5;
+   if(finish)finish();minigameData=null;return;
+  }
+  if(Math.abs(p[1]-confirmY)<=24*S&&Math.abs(p[0]-(cx+70*S))<=56*S){const finish=minigameData.onFinish;if(finish)finish();minigameData=null;return;}
+  return;
+ }
  if(state==='name'||state==='roomcode'){const target=hitButton(x,y);if(target){target.fn();}return;}
  const target=hitInputControl(x,y);
  if(target&&target.type==='button'){target.control.fn();return;}
