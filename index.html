@@ -109,6 +109,24 @@ let codexUnlocked = loadStore('p_codex', []);
 let codexOpen = false, codexTab = 0, codexButtonStart = 0; // Tab hiện tại và vùng nút riêng của sổ công thức
 let toastMsg = '', toastTimer = 0;
 
+const CODEX_UNLOCK_HINTS = [
+ 'Điều kiện mở khóa chưa được lập trình trong bản hiện tại.',
+ 'Kéo thanh Góc chiếu để thay đổi góc chiếu sáng.',
+ 'Điều kiện mở khóa chưa được lập trình trong bản hiện tại.',
+ 'Điều kiện mở khóa chưa được lập trình trong bản hiện tại.',
+ 'Điều kiện mở khóa chưa được lập trình trong bản hiện tại.',
+ 'Vào màn có công cụ Hóa học, chọn Điện và dùng lên ô đất có nước.',
+ 'Vào màn Hóa học, làm nóng ô có đá vôi đến trên 80°C.',
+ 'Trong màn Hóa học, chọn Vôi và dùng lên ô đất.',
+ 'Trong màn Hóa học, kích hoạt núi lửa rồi tạo mưa khi có hơi nước.',
+ 'Tạo đủ khí H₂ và O₂ rồi để xảy ra phản ứng cháy do nhiệt cao.',
+ 'Giữ cây sống và đủ nước/ánh sáng để cây quang hợp.',
+ 'Để động vật ăn cỏ ăn cây.',
+ 'Tạo động vật ăn thịt và để chúng săn động vật ăn cỏ.',
+ 'Điều kiện mở khóa chưa được lập trình trong bản hiện tại.',
+ 'Vào màn Hóa học và duy trì ít nhất một cây đang hoạt động.'
+];
+
 const CODEX_ENTRIES = [
  // Physics (0-4)
  {tab:0, title:'Định luật nhiệt', formula:'Q = m / c / \\Delta T', desc:'Nhiệt lượng làm thay đổi nhiệt độ đất.'},
@@ -1572,7 +1590,15 @@ function drawCodex(){
    formulaText(entry.formula,cx,ey+rowH*.54,formulaSize,'#ffe28a','center','700');
    txt(entry.desc,cx,ey+rowH*.82,descSize,'rgba(255,255,255,0.85)','center','500');
   }else{
-   txt('🔒 Chưa mở khóa',cx,ey+rowH*.55,Math.min(12*S,W*.032),'rgba(255,255,255,0.6)','center','600');
+   txt('🔒 '+entry.title,cx,ey+rowH*.25,Math.min(12*S,W*.032),'#c3d2df','center','700');
+   const hint=CODEX_UNLOCK_HINTS[entryIdx]||'Tiếp tục khám phá các màn chơi.';
+   const hintSize=Math.max(8,Math.min(10*S,W*.027));
+   const words=hint.split(' ');let lines=[],line='';
+   const maxChars=Math.max(18,Math.floor(cardW/(hintSize*.55)));
+   for(const word of words){if((line+' '+word).trim().length>maxChars&&line){lines.push(line);line=word;}else line=(line+' '+word).trim();}
+   if(line)lines.push(line);
+   const lineH=hintSize*1.15,baseY=ey+rowH*.52-(Math.min(lines.length,2)-1)*lineH/2;
+   lines.slice(0,2).forEach((ln,j)=>txt(ln,cx,baseY+j*lineH,hintSize,'#e6b35a','center','500'));
   }
  }
  button('Đóng',cx,panelY+panelH*.91,120*S,34*S,()=>{codexOpen=false;},'#ffd36b');
