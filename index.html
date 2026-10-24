@@ -151,7 +151,7 @@ const EQUATIONS = [
 
 function startMinigame(onFinish){
  const eq = pick(EQUATIONS);
- let userVals = new Array(eq.ans.length).fill(1);
+ let userVals = eq.ans.map(v=>v===1?2:1);
  minigameData = {eq:eq, vals:userVals, onFinish:onFinish};
 }
 
@@ -931,9 +931,9 @@ function txt(s,x,y,size,col,al,wt){
 }
 
 function formulaSource(raw){
- return String(raw).replace(/\\\\(?:rightarrow|rightleftharpoons|xrightarrow(?:\{[^}]*\})?|propto|approx|Delta|sum|cdot|frac)/g,m=>({'\\\\rightarrow':' -> ','\\\\rightleftharpoons':' <-> ','\\\\propto':' proportional ','\\\\approx':' approx ','\\\\Delta':'Delta','\\\\sum':'sum','\\\\cdot':' * ','\\\\frac':' '}[m]||' -> '))
- .replace(/\\\\xrightarrow(?:\{[^}]*\})?/g,' -> ').replace(/\\\\_/g,'_').replace(/\\\\\{/g,'').replace(/\\\\\}/g,'')
- .replace(/\{[^}]*\}/g,m=>m.slice(1,-1)).replace(/\\\\[a-zA-Z]+/g,'').replace(/\s+/g,' ').trim();
+ return String(raw).replace(/\\(?:rightarrow|rightleftharpoons|xrightarrow(?:\{[^}]*\})?|propto|approx|Delta|sum|cdot|frac)/g,m=>({'\\rightarrow':' -> ','\\rightleftharpoons':' <-> ','\\propto':' proportional ','\\approx':' approx ','\\Delta':'Delta','\\sum':'sum','\\cdot':' * ','\\frac':' '}[m]||' -> '))
+ .replace(/\\xrightarrow(?:\{[^}]*\})?/g,' -> ').replace(/\\_/g,'_').replace(/\\\{/g,'').replace(/\\\}/g,'')
+ .replace(/\{[^}]*\}/g,m=>m.slice(1,-1)).replace(/\\[a-zA-Z]+/g,'').replace(/\s+/g,' ').trim();
 }
 function formulaText(raw,x,y,size,col,al,wt){
  const str=formulaSource(raw),align=al||'left';
@@ -1532,7 +1532,7 @@ function drawMinigame(){
  txt(minigameData.eq.name, cx, H*0.36, 16*S, '#fff', 'center', '700');
  // Hệ số tương tác trực tiếp: chạm dấu trừ/cộng để chỉnh từng hệ số.
  let coefficientIndex=0;
- const shown=minigameData.eq.q.replace(/__/g,()=>String(minigameData.vals[coefficientIndex++]));
+ const shown=minigameData.eq.q.replace(/__/g,()=>{const v=minigameData.vals[coefficientIndex++];return v===1?'':String(v);});
  formulaText(shown, cx, H*0.44, 18*S, '#8ef0a0', 'center', '700');
  const count=minigameData.vals.length;
  const gap=Math.min(62*S,(W*0.64)/Math.max(1,count));
