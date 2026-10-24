@@ -581,6 +581,8 @@ function tick(){
   if(t.scaleAnim && t.scaleAnim > 1) t.scaleAnim = Math.max(1, t.scaleAnim - 0.05);
 
   t.T+=(20+70*l+gh-t.T)*.1;
+  // Rain should cool the surface instead of raising its temperature.
+  if(rainT>0) t.T-=0.35;
   t.T=clamp(t.T, -50, 200);
   if(t.des){t.P=0;t.W=0;t.frozen=false;continue;}
 
