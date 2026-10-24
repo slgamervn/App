@@ -1419,10 +1419,17 @@ function drawHUD(){
  }else{
   txt((lvl+1)+'/12  /  '+L.name,pad,28*S,15*S,'#fff','left','700');
   const el=ticks*TICK+(state==='play'?acc:0),tl=Math.max(0,DUR-el);
-  txt(Math.ceil(tl)+'s',W-pad,28*S,15*S,'#fff','right','700');
-  const f=clamp(el/DUR,0,1);
-  rr(ctx,pad,36*S,W-pad*2,8*S,4);ctx.fillStyle='rgba(255,255,255,.15)';ctx.fill();
-  rr(ctx,pad,36*S,(W-pad*2)*f,8*S,4);ctx.fillStyle=f>.8?'#ffb25a':'#7fe3a0';ctx.fill();
+  if(isEndless){
+   txt('Sống sót '+formatSurvivalTime(Math.floor(el)),W-pad,28*S,15*S,'#ffe28a','right','700');
+   const f=(el%60)/60;
+   rr(ctx,pad,36*S,W-pad*2,8*S,4);ctx.fillStyle='rgba(255,255,255,.15)';ctx.fill();
+   rr(ctx,pad,36*S,(W-pad*2)*f,8*S,4);ctx.fillStyle='#e6b35a';ctx.fill();
+  }else{
+   txt(Math.ceil(tl)+'s',W-pad,28*S,15*S,'#fff','right','700');
+   const f=clamp(el/DUR,0,1);
+   rr(ctx,pad,36*S,W-pad*2,8*S,4);ctx.fillStyle='rgba(255,255,255,.15)';ctx.fill();
+   rr(ctx,pad,36*S,(W-pad*2)*f,8*S,4);ctx.fillStyle=f>.8?'#ffb25a':'#7fe3a0';ctx.fill();
+  }
 
   const segs=[['Cây',c.p,L.g.p],['Ăn cỏ',c.h,L.g.h]];if(L.g.c>0)segs.push(['Ăn thịt',c.c,L.g.c]);
   let x=pad;const sz=14*S;
