@@ -197,6 +197,7 @@ let isSandbox=false,sbTool='water',simSpeed=1;
 // Tutorial State
 let tutorialStep=loadStore('p_tut',0);
 let tutorialActive=false,tutorialIndex=0,tutorialSeen=!!loadStore('p_tutorial_seen',false);
+let tutorialStartsGame=false,tutorialReturnState='menu';
 const TUTORIAL_STEPS=[
 {title:'1. Mục tiêu',body:'Mỗi màn có yêu cầu riêng. Hãy đọc mục tiêu ở đầu màn hình và hoàn thành trước khi hết giờ.'},
 {title:'2. Chọn công cụ',body:'Chạm công cụ ở hàng phía dưới để chọn. Công cụ đang chọn sẽ được làm nổi bật. Dùng mũi tên nếu cần chuyển trang công cụ.'},
@@ -210,6 +211,13 @@ function closeTutorial(){
  tutorialActive=false;
  tutorialSeen=true;
  saveStore('p_tutorial_seen',true);
+ // The first-run guide is a pre-game screen: begin only after the player
+ // explicitly leaves the guide. Opening it from the menu returns to the menu.
+ state=tutorialStartsGame?'play':tutorialReturnState;
+ stateT=0;
+ acc=0;
+ tutorialStartsGame=false;
+ tutorialReturnState='menu';
 }
 function advanceTutorial(){
  if(tutorialIndex<TUTORIAL_STEPS.length-1)tutorialIndex++;
@@ -544,7 +552,11 @@ function startLevel(i, sandbox=false, endless=false){
  elecCharges = sandbox ? 99 : 3;
  elecCool = 0;
  terrainDirty=true;
- state='play';stateT=0;if(!sandbox&&lvl===0&&!tutorialSeen){tutorialActive=true;tutorialIndex=0;}
+ state='play';stateT=0;
+ if(!sandbox&&lvl===0&&!tutorialSeen){
+  tutorialActive=true;tutorialIndex=0;tutorialStartsGame=true;tutorialReturnState='play';
+  state='tutorial';stateT=0;acc=0;
+ }
 }
 
 function counts(){let p=0;for(const t of tiles)if(!t.des&&t.P>=25)p++;return {p:p,h:herbs.length,c:carns.length};}
@@ -1776,7 +1788,7 @@ function drawLevelSelect(){
 }
 
 function drawOverlay(){
- if(state==='play'||state==='collapse')return;
+ if(state==='play'||state==='collapse'||state==='tutorial')return;
  const a=Math.min(1,stateT*3);
  ctx.fillStyle='rgba(8,14,22,'+(.75*a)+')';ctx.fillRect(0,0,W,H);
  ctx.globalAlpha=a;
@@ -1806,7 +1818,7 @@ function drawOverlay(){
    ['Chơi vô tận','#dcae56',()=>startLevel(0,false,true)],
    ['Sổ công thức','#a982e8',()=>codexOpen=true],
    ['Thi đấu trực tuyến',onlineEnabled()?'#398b68':'#455a62',()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;}],
-   ['Hướng dẫn chơi','#4b9fc2',()=>{tutorialIndex=0;tutorialActive=true;}]
+   ['Hướng dẫn chơi','#4b9fc2',()=>{tutorialIndex=0;tutorialActive=true;tutorialStartsGame=false;tutorialReturnState='menu';}]
   ];
   const maxMenuBottom=H-(compact?126*S:135*S);
   const available=Math.max(bh*menuItems.length, maxMenuBottom-mainStart);
