@@ -1476,45 +1476,35 @@ function drawCodex(){
  if(!codexOpen) return;
  ctx.fillStyle='rgba(6,11,17,0.92)'; ctx.fillRect(0,0,W,H);
 
- const cx=W/2, cy=H/2;
- rr(ctx, W*0.08, H*0.08, W*0.84, H*0.84, 20*S);
- ctx.fillStyle='#122232'; ctx.fill();
- ctx.strokeStyle='#3d5a73'; ctx.lineWidth=2; ctx.stroke();
-
- txt('Sổ Công Thức (Codex)', cx, H*0.14, 22*S, '#bfffd0', 'center', '800');
- const unlockedCount = codexUnlocked.length;
- txt('Đã mở: '+unlockedCount+'/15', cx, H*0.175, 13*S, '#ffe28a', 'center', '600');
-
- const tabs = ['Lý (Physics)', 'Hóa (Chemistry)', 'Sinh (Biology)'];
- const tw = W*0.24, ty = H*0.21;
- tabs.forEach((tb, i)=>{
-  const tx = W*0.14 + i * (tw + W*0.04);
-  const sel = codexTab === i;
-  button(tb, tx + tw/2, ty, tw, 32*S, ()=>{ codexTab = i; }, sel?'#7fe3a0':'#2c4058');
+ const cx=W/2;
+ const panelX=W*.05,panelY=H*.045,panelW=W*.90,panelH=H*.91;
+ rr(ctx,panelX,panelY,panelW,panelH,18*S);
+ ctx.fillStyle='#122232';ctx.fill();ctx.strokeStyle='#3d5a73';ctx.lineWidth=2;ctx.stroke();
+ txt('Sổ Công Thức',cx,H*.095,Math.min(22*S,W*.055),'#bfffd0','center','800');
+ txt('Đã mở: '+codexUnlocked.length+'/15',cx,H*.125,12*S,'#ffe28a','center','600');
+ const tabs=['Vật lý','Hóa học','Sinh học'];
+ const tabGap=5*S,tabW=(panelW-24*S-2*tabGap)/3,tabY=H*.17;
+ tabs.forEach((tb,i)=>{
+  const tx=panelX+12*S+i*(tabW+tabGap),sel=codexTab===i;
+  button(tb,tx+tabW/2,tabY,tabW,30*S,()=>{codexTab=i;},sel?'#7fe3a0':'#2c4058');
  });
-
- // Render entries
- let startIdx = codexTab * 5;
- for(let i=0; i<5; i++){
-  const entryIdx = startIdx + i;
-  const entry = CODEX_ENTRIES[entryIdx];
-  const unlocked = codexUnlocked.includes(entryIdx);
-  const ey = H*0.28 + i * (H*0.10);
-
-  rr(ctx, W*0.12, ey, W*0.76, H*0.085, 10*S);
-  ctx.fillStyle=unlocked?'#1b3248':'#101a24'; ctx.fill();
-  ctx.strokeStyle=unlocked?'#4c7a9c':'#223344'; ctx.stroke();
-
+ const startIdx=codexTab*5;
+ const listTop=H*.215,listBottom=H*.805,rowGap=(listBottom-listTop)/5,rowH=rowGap-5*S;
+ for(let i=0;i<5;i++){
+  const entryIdx=startIdx+i,entry=CODEX_ENTRIES[entryIdx],unlocked=codexUnlocked.includes(entryIdx);
+  const ey=listTop+i*rowGap;
+  rr(ctx,panelX+10*S,ey,panelW-20*S,rowH,8*S);
+  ctx.fillStyle=unlocked?'#1b3248':'#101a24';ctx.fill();
+  ctx.strokeStyle=unlocked?'#4c7a9c':'#223344';ctx.lineWidth=1;ctx.stroke();
   if(unlocked){
-   txt(entry.title, W*0.15, ey + 22*S, 14*S, '#bfffd0', 'left', '700');
-   formulaText(entry.formula, W*0.15, ey + 42*S, 13*S, '#ffe28a', 'left', '700');
-   txt(entry.desc, W*0.48, ey + 32*S, 11*S, 'rgba(255,255,255,0.8)', 'left', '500');
-  } else {
-   txt('[ Khóa - Hãy khám phá trong trò chơi ]', W*0.15, ey + 32*S, 13*S, 'rgba(255,255,255,0.4)', 'left', '600');
+   txt(entry.title,cx,ey+Math.min(17*S,rowH*.24),Math.min(13*S,W*.034),'#bfffd0','center','700');
+   formulaText(entry.formula,cx,ey+rowH*.53,Math.min(13*S,W*.034),'#ffe28a','center','700');
+   txt(entry.desc,cx,ey+rowH*.82,Math.min(10*S,W*.027),'rgba(255,255,255,0.8)','center','500');
+  }else{
+   txt('🔒 Chưa mở khóa',cx,ey+rowH*.55,Math.min(12*S,W*.032),'rgba(255,255,255,0.55)','center','600');
   }
  }
-
- button('Đóng', cx, H*0.86, 120*S, 38*S, ()=>{ codexOpen = false; }, '#ffd36b');
+ button('Đóng',cx,H*.865,120*S,34*S,()=>{codexOpen=false;},'#ffd36b');
 }
 
 // ---------- Balancing Mini-Game Overlay ----------
@@ -1715,7 +1705,7 @@ function hitInputControl(x,y){
 cv.addEventListener('pointerdown',e=>{
  e.preventDefault();initAudio();
  const p=ptr(e),x=p[0],y=p[1];
- if(codexOpen){codexOpen=false;return;}
+ if(codexOpen){const codexTarget=hitInputControl(x,y);if(codexTarget&&codexTarget.type==='button'){codexTarget.control.fn();return;}codexOpen=false;return;}
  if(minigameData){
   const cx=W/2,count=minigameData.vals.length,gap=Math.min(62*S,(W*0.64)/Math.max(1,count)),rowW=gap*count,startX=cx-rowW/2+gap/2,y=H*0.53;
   for(let i=0;i<count;i++){
