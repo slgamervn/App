@@ -1714,39 +1714,70 @@ function drawOverlay(){
  ctx.globalAlpha=a;
  const cx=W/2,cy=H*.36;
  if(state==='menu'){
-  const compact=H<760;
-  const bob=Math.sin(tAll*2)*Math.min(6*S,H*.008);
-  const titleSize=Math.min(32*S,W*.085,H*.065);
-  const titleY=compact?H*.085:H*.105;
-  txt('Hệ Sinh Thái',cx,titleY+bob,titleSize,'#bfffd0','center','800');
-  txt('Hành Tinh Xanh',cx,titleY+titleSize*1.08+bob,titleSize,'#bfffd0','center','800');
-  txt('Dùng thấu kính mặt trời và phản ứng hóa học.',cx,titleY+titleSize*1.8+8*S,Math.min(13*S,W*.035),'rgba(255,255,255,.85)','center','500');
-
-  const pulse=0.94 + 0.06*Math.sin(tAll*4);
-  const mainW=Math.min(280*S,W*.78), buttonH=Math.min(42*S,H*(compact?.055:.052));
-  const ys=compact?[.37,.46,.55,.64,.73]:[.42,.51,.60,.69,.78];
-  button('Bắt đầu',cx,H*ys[0],mainW,buttonH,()=>state='select');
-  button('Phòng thí nghiệm',cx,H*ys[1],mainW,buttonH,()=>startLevel(0,true),'#7fe3a0');
-  button('Chơi vô tận',cx,H*ys[2],mainW,buttonH,()=>startLevel(0,false,true),'#e6b35a');
-  button('Sổ công thức',cx,H*ys[3],mainW,buttonH,()=>codexOpen=true,'#b08af0');
-  button('Cài đặt',cx,H*(compact?.82:.86),Math.min(145*S,W*.44),Math.min(30*S,H*.045),()=>openSettings('menu'),'#8ecbff');
-  button('Thi đấu trực tuyến',cx,H*ys[4],mainW,buttonH,()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;},onlineEnabled()?'#6fd68a':'#53636d');
-  ctx.fillStyle=onlineEnabled()?'#42d987':'#6b7a82';circ(ctx,cx-mainW*.42,H*ys[4],4*S);
-  const bottomY=H*(compact?.91:.94),halfGap=Math.min(8*S,W*.025),smallW=Math.min((W-24*S-halfGap)/2,mainW*.52),smallH=Math.min(34*S,H*(compact?.05:.045));
-  button('Bảng xếp hạng',cx-smallW/2-halfGap/2,bottomY,smallW,smallH,()=>openLeaderboard(0),'#8ecbff');
-  button('BXH vô tận',cx+smallW/2+halfGap/2,bottomY,smallW,smallH,()=>openLeaderboard(12),'#e6b35a');
+  const compact=H<760,wide=W>H*0.82;
+  const cx=W/2;
+  const titleSize=Math.min(31*S,W*.082,H*.06);
+  const top=compact?Math.max(42*S,H*.075):H*.11;
+  const cardW=Math.min(W-28*S,wide?540*S:390*S);
+  const cardX=cx-cardW/2;
+  const cardTop=top-24*S;
+  const cardBottom=H-18*S;
+  rr(ctx,cardX,cardTop,cardW,cardBottom-cardTop,24*S);
+  ctx.fillStyle='rgba(11,23,34,.82)';ctx.fill();
+  ctx.strokeStyle='rgba(169,222,208,.16)';ctx.lineWidth=1;ctx.stroke();
+  txt('HỆ SINH THÁI',cx,top,titleSize*.52,'#80e6b0','center','800');
+  txt('HÀNH TINH XANH',cx,top+titleSize*.78,titleSize,'#f3f8f5','center','850');
+  txt('PHÒNG MÔ PHỎNG KHOA HỌC',cx,top+titleSize*1.35,Math.min(10*S,W*.027),'#9bb7bd','center','700');
+  const mainW=Math.min(cardW-38*S,wide?350*S:300*S);
+  const bh=Math.min(43*S,compact?H*.052:46*S);
+  const gap=Math.min(11*S,H*.014);
+  const mainStart=top+titleSize*1.75+18*S;
+  const menuItems=[
+   ['Bắt đầu hành trình','#54d99a',()=>state='select'],
+   ['Phòng thí nghiệm','#337f69',()=>startLevel(0,true)],
+   ['Chơi vô tận','#dcae56',()=>startLevel(0,false,true)],
+   ['Sổ công thức','#a982e8',()=>codexOpen=true],
+   ['Thi đấu trực tuyến',onlineEnabled()?'#398b68':'#455a62',()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;}]
+  ];
+  const maxMenuBottom=H-(compact?126*S:135*S);
+  const available=Math.max(bh*5, maxMenuBottom-mainStart);
+  const itemGap=Math.min(gap,Math.max(3*S,(available-bh*5)/4));
+  const total=bh*5+itemGap*4;
+  const actualStart=Math.min(mainStart, maxMenuBottom-total);
+  menuItems.forEach((it,i)=>{
+   const y=actualStart+i*(bh+itemGap);
+   button(it[0],cx,y,mainW,bh, it[2],it[1]);
+  });
+  const utilityY=Math.min(H-83*S,actualStart+total+12*S);
+  const utilGap=8*S;
+  const utilW=Math.min((cardW-44*S-utilGap)/3,mainW*.34);
+  const utilH=Math.min(34*S,compact?31*S:35*S);
+  button('Cài đặt',cx-utilW-utilGap,utilityY,utilW,utilH,()=>openSettings('menu'),'#8ecbff');
+  button('BXH màn',cx,utilityY,utilW,utilH,()=>openLeaderboard(0),'#526f85');
+  button('BXH vô tận',cx+utilW+utilGap,utilityY,utilW,utilH,()=>openLeaderboard(12),'#a87939');
+  txt('HỌC • THỬ NGHIỆM • KHÁM PHÁ',cx,H-35*S,Math.min(9*S,W*.024),'rgba(193,219,220,.58)','center','600');
  }else if(state==='settings'){
-  txt('CÀI ĐẶT',cx,cy-68*S,25*S,'#bfffd0','center','800');
-  button('Âm thanh: '+(muted?'Tắt':'Bật'),cx,H*.43,220*S,42*S,()=>{muted=!muted;saveStore('p_muted',muted);if(master&&AC)try{master.gain.setTargetAtTime(muted?0:.5,AC.currentTime,.02);}catch(_){}},muted?'#53636d':'#6fd68a');
-  button('Rung: '+(vibrationEnabled?'Bật':'Tắt'),cx,H*.52,220*S,42*S,()=>{vibrationEnabled=!vibrationEnabled;saveStore('p_vibration',vibrationEnabled);},vibrationEnabled?'#6fd68a':'#53636d');
-  button('Toàn màn hình',cx,H*.61,220*S,42*S,()=>toggleFullscreen(),'#8ecbff');
-  button('Quay lại',cx,H*.75,150*S,42*S,()=>closeSettings(),'#ffd36b');
+  const cx=W/2,compact=H<620;
+  const cardW=Math.min(W-28*S,390*S),cardH=Math.min(H-36*S,400*S);
+  rr(ctx,cx-cardW/2,H/2-cardH/2,cardW,cardH,22*S);ctx.fillStyle='rgba(12,25,36,.96)';ctx.fill();ctx.strokeStyle='rgba(169,222,208,.2)';ctx.stroke();
+  txt('CÀI ĐẶT',cx,H/2-cardH/2+42*S,24*S,'#bfffd0','center','800');
+  txt('Tùy chỉnh trải nghiệm mô phỏng',cx,H/2-cardH/2+67*S,11*S,'#9bb7bd','center','500');
+  const bh=Math.min(42*S,compact?36*S:44*S),gap=compact?9*S:12*S;
+  const first=H/2-cardH/2+(compact?100*S:112*S);
+  button('Âm thanh  ·  '+(muted?'Tắt':'Bật'),cx,first,cardW-40*S,bh,()=>{muted=!muted;saveStore('p_muted',muted);if(master&&AC)try{master.gain.setTargetAtTime(muted?0:.5,AC.currentTime,.02);}catch(_){}},muted?'#455a62':'#398b68');
+  button('Rung  ·  '+(vibrationEnabled?'Bật':'Tắt'),cx,first+bh+gap,cardW-40*S,bh,()=>{vibrationEnabled=!vibrationEnabled;saveStore('p_vibration',vibrationEnabled);},vibrationEnabled?'#398b68':'#455a62');
+  button('Toàn màn hình',cx,first+(bh+gap)*2,cardW-40*S,bh,()=>toggleFullscreen(),'#337f94');
+  button('Quay lại',cx,H/2+cardH/2-32*S,cardW-40*S,Math.min(38*S,bh),()=>closeSettings(),'#dcae56');
  }else if(state==='paused'){
-  txt('ĐÃ TẠM DỪNG',cx,cy-70*S,25*S,'#ffe28a','center','800');
-  button('Tiếp tục',cx,H*.43,220*S,44*S,()=>{state='play';stateT=0;},'#6fd68a');
-  button('Chơi lại',cx,H*.53,220*S,42*S,()=>startLevel(lvl,isSandbox,isEndless),'#8ecbff');
-  button('Cài đặt',cx,H*.63,220*S,42*S,()=>openSettings('paused'),'#b08af0');
-  button('Về menu chính',cx,H*.73,220*S,42*S,()=>{state='menu';stateT=0;codexOpen=false;},'#ffd36b');
+  const cx=W/2,compact=H<620,cardW=Math.min(W-28*S,390*S),cardH=Math.min(H-36*S,390*S);
+  rr(ctx,cx-cardW/2,H/2-cardH/2,cardW,cardH,22*S);ctx.fillStyle='rgba(12,25,36,.97)';ctx.fill();ctx.strokeStyle='rgba(255,226,138,.2)';ctx.stroke();
+  txt('MÔ PHỎNG ĐANG DỪNG',cx,H/2-cardH/2+44*S,Math.min(21*S,W*.06),'#ffe28a','center','800');
+  txt('Tiến trình của bạn vẫn được giữ lại',cx,H/2-cardH/2+69*S,11*S,'#9bb7bd','center','500');
+  const bh=Math.min(42*S,compact?36*S:44*S),gap=compact?8*S:11*S,first=H/2-cardH/2+(compact?98*S:112*S),bw=cardW-40*S;
+  button('Tiếp tục mô phỏng',cx,first,bw,bh,()=>{state='play';stateT=0;},'#54d99a');
+  button('Chơi lại từ đầu',cx,first+(bh+gap),bw,bh,()=>startLevel(lvl,isSandbox,isEndless),'#337f94');
+  button('Cài đặt',cx,first+(bh+gap)*2,bw,bh,()=>openSettings('paused'),'#a982e8');
+  button('Về màn hình chính',cx,H/2+cardH/2-31*S,bw,Math.min(38*S,bh),()=>{state='menu';stateT=0;codexOpen=false;},'#dcae56');
  }else if(state==='select'){
   drawLevelSelect();
   button('Bảng xếp hạng',cx-75*S,H*.94,145*S,38*S,()=>openLeaderboard(0),'#7fe3a0');
