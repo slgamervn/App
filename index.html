@@ -838,10 +838,12 @@ function exportCanvasImage(){
  const tempCv=document.createElement('canvas');
  tempCv.width=cv.width; tempCv.height=cv.height;
  const tCtx=tempCv.getContext('2d');
- tCtx.drawImage(bgCanvas, 0, 0);
+ tCtx.fillStyle='#060b11';tCtx.fillRect(0,0,tempCv.width,tempCv.height);
+ tCtx.drawImage(bgCanvas, gameOffset*DPR, 0);
 
  tCtx.save();
  tCtx.scale(DPR, DPR);
+ tCtx.translate(gameOffset, 0);
  const tw=lay.tw;
  const tN=ticks*TICK+acc;
  hs=hotspot(tN);
