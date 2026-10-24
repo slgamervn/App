@@ -21,7 +21,7 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none;-webkit-tap-high
 <script>
 (()=>{
 'use strict';
-const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const cv=document.getElementById('c');let ctx=cv.getContext('2d');
 const N=8,TICK=0.25,DUR=45,TT=180,TAU=Math.PI*2;
 // Hóa học R2: mỗi ô đại diện cột khí/nước 1 m²; mm nước = L/m².
 // Hằng số phản ứng theo tỉ lượng mol; nhiệt dùng J, năng lượng phản ứng dùng kJ/mol.
@@ -111,7 +111,7 @@ const TUTORIAL_STEPS=[
  {title:'4. Điều chỉnh ánh sáng',body:'Nếu thấy thanh Góc chiếu hoặc Tiêu cự, kéo thanh để thay đổi vùng và độ tập trung của ánh sáng. Nắng tập trung quá mạnh có thể làm đất nóng, khô; ánh sáng quá yếu có thể khiến hệ sinh thái thiếu năng lượng.'},
  {title:'5. Đọc thông tin và phản hồi',body:'Theo dõi mục tiêu ở đầu màn hình để biết còn thiếu gì. Mở Môi trường để xem nhiệt độ, nước, hơi nước và các chỉ số khác nếu màn có hỗ trợ. Sau mỗi thao tác, đợi một chút để thấy hệ sinh thái phản ứng.'},
  {title:'6. Cách thắng và tránh thua',body:'Hoàn thành đủ mục tiêu trước khi đồng hồ về 0. Giữ nhiệt độ, nước và số lượng sinh vật ở mức hợp lý; nếu một loài tăng quá nhiều hoặc biến mất, chuỗi thức ăn có thể bị ảnh hưởng. Màn hóa học có thể thêm yêu cầu về pH và O₂.'},
- {title:'7. Tạm dừng và xem lại',body:'Chạm nút Ⅱ ở góc trên để tạm dừng, tiếp tục hoặc chơi lại. Nút Lớp xem hoặc phím O trên máy tính đổi lớp hiển thị. Muốn xem lại hướng dẫn, vào Cài đặt → Xem lại hướng dẫn.'}
+ {title:'7. Tạm dừng và xem lại',body:'Chạm nút Ⅱ ở góc trên để tạm dừng, tiếp tục hoặc chơi lại. Mở Cài đặt để điều chỉnh tùy chọn, hoặc mở Sổ công thức để xem kiến thức đã khám phá. Muốn xem lại hướng dẫn, vào Cài đặt → Xem lại hướng dẫn.'}
 ];
 let chemDebugLast=null;
 let toastMsg = '', toastTimer = 0;
@@ -845,13 +845,13 @@ function exportCanvasImage(){
  objs.sort((p,q)=>p.d-q.d);
 
  const oldCtx = ctx;
- ctx = tCtx;
- for(const o of objs){
-  if(o.k===0){const p=proj(o.x,o.y);drawPlant(p[0],p[1],o.P,o.wv,o.sc,o.x,o.y);}
-  else{const p=proj(o.a.fx,o.a.fy);if(o.k===1)drawHerb(p[0],p[1],o.a,o.sc);else drawCarn(p[0],p[1],o.a,o.sc);}
- }
- ctx = oldCtx;
- tCtx.restore();
+ try{
+  ctx = tCtx;
+  for(const o of objs){
+   if(o.k===0){const p=proj(o.x,o.y);drawPlant(p[0],p[1],o.P,o.wv,o.sc,o.x,o.y);}
+   else{const p=proj(o.a.fx,o.a.fy);if(o.k===1)drawHerb(p[0],p[1],o.a,o.sc);else drawCarn(p[0],p[1],o.a,o.sc);}
+  }
+ }finally{ctx=oldCtx;tCtx.restore();}
 
  tCtx.font='700 '+(16*S*DPR)+'px system-ui, sans-serif';
  tCtx.fillStyle='rgba(255,255,255,0.75)';
@@ -1230,7 +1230,17 @@ function drawReplayWorld(){
  const targetIdx = (ringHead - ringSize + replayIdx + REPLAY_MAX) % REPLAY_MAX;
  const snap = ringSnapshots[targetIdx];
 
- renderTerrainToBuffer();
+ const liveTerrain=tiles.map(t=>({T:t.T,W:t.W,P:t.P,pH:t.pH,des:t.des,frozen:t.frozen}));
+ const terrainDirtyBefore=terrainDirty;
+ try{
+  for(let i=0;i<tiles.length;i++){
+   const t=tiles[i];t.T=snap.tilesT[i];t.W=snap.tilesW[i];t.P=snap.tilesP[i];t.pH=snap.tilespH[i];t.des=!!snap.tilesDes[i];t.frozen=!!snap.tilesFrozen[i];
+  }
+  terrainDirty=true;renderTerrainToBuffer();
+ }finally{
+  for(let i=0;i<tiles.length;i++)Object.assign(tiles[i],liveTerrain[i]);
+  terrainDirty=terrainDirtyBefore;
+ }
  ctx.drawImage(bgCanvas, 0, 0, cv.width/DPR, cv.height/DPR);
 
  const objs=[];
