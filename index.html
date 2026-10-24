@@ -237,9 +237,9 @@ function resize(){
  bgCanvas.width=cv.width; bgCanvas.height=cv.height;
  offBloomCv.width=Math.round(vw*DPR*0.25); offBloomCv.height=Math.round(H*DPR*0.25);
  terrainDirty=true;
- S=Math.max(.75,Math.min(1.3,Math.min(W,H)/390));
+ S=Math.max(.78,Math.min(1.12,Math.min(W,H)/390));
  canvasRect=cv.getBoundingClientRect();positionTextInput();
- const top=110*S,bot=H*0.72;
+ const top=175*S,bot=H*0.72;
  const tw=Math.max(18,Math.min((W-24)/8,(bot-top-40)/4));
  lay.tw=tw;lay.th=tw/2;lay.top=top;lay.bot=bot;
  lay.cx=W/2;lay.cy=top+(bot-top)/2+10;
@@ -1406,7 +1406,7 @@ function drawHUD(){
  const L=LEVELS[lvl]||LEVELS[0];
  const hasChem = isSandbox || L.chem;
 
- const hudH = isSandbox ? 115*S : (hasChem ? 135*S : 110*S);
+ const hudH = isSandbox ? 132*S : (hasChem ? 158*S : 137*S);
  rr(ctx, pad*0.5, 8*S, W - pad, hudH, 16*S);
  ctx.fillStyle='rgba(18, 32, 48, 0.65)'; ctx.fill();
  ctx.strokeStyle='rgba(255, 255, 255, 0.15)'; ctx.lineWidth=1; ctx.stroke();
@@ -1435,14 +1435,14 @@ function drawHUD(){
   let x=pad;const sz=14*S;
   segs.forEach((sg,i)=>{
    const s=sg[0]+' '+sg[1]+'/'+sg[2]+(i<segs.length-1?', ':'');
-   txt(s,x,62*S,sz,sg[1]>=sg[2]?'#8ef0a0':'#ffe28a','left','700');
+   txt(s,x,86*S,sz,sg[1]>=sg[2]?'#8ef0a0':'#ffe28a','left','700');
    x+=ctx.measureText(s).width;
   });
  }
 
  let sT=0,sW=0,spH=0;
  if(tiles.length>0){for(const t of tiles){sT+=t.T;sW+=t.W;spH+=t.pH;}}
- const mw=(W-pad*2)/4,my=isSandbox?42*S:(hasChem?62*S:78*S);
+ const mw=(W-pad*2)/4,my=isSandbox?78*S:105*S;
  meter(pad,mw,'Nhiệt '+((sT/64)|0)+' deg',sT/64,100,'#ff8a5c',my);
  meter(pad+mw,mw,'Nước '+((sW/64)|0)+'%',sW/64,100,'#5cb4ff',my);
  meter(pad+mw*2,mw,'Hơi '+(vapor|0),vapor,100,'#d6e2ee',my);
@@ -1458,18 +1458,18 @@ function drawHUD(){
 
  if(!isSandbox && state==='play'&&hintT<9){
   const a=clamp(Math.min(1,(9-hintT)/1.5),0,1)*.75;
-  if(LEVELS[lvl]) LEVELS[lvl].hint.forEach((h,i)=>txt(h,W/2,(124+i*14)*S,11*S,'rgba(255,255,255,'+a+')','center','500'));
+  const hintY=(hasChem?164:148)*S;
+  if(LEVELS[lvl]) LEVELS[lvl].hint.forEach((h,i)=>txt(h,W/2,hintY+i*14*S,11*S,'rgba(255,255,255,'+a+')','center','500'));
  }
 
- // Nút Sổ công thức nằm ở mép trên bên phải, tách khỏi các đồng hồ CO2/H2/pH.
- button('Ⅱ',W-116*S,72*S,42*S,34*S,()=>togglePause(),'#e6b35a');
- button('⚙',W-66*S,72*S,42*S,34*S,()=>openSettings('play'),'#8ecbff');
- const codexBtnW=100*S,codexBtnH=28*S;
- const codexBtnX=W-codexBtnW/2-12*S;
- const codexBtnY=isSandbox?42*S:42*S;
- button('Sổ công thức',codexBtnX,codexBtnY,codexBtnW,codexBtnH,()=>{
-  codexOpen=true;
- },'#b08af0');
+ // Nhóm thao tác nằm trên cùng một hàng riêng, phía trên chỉ số môi trường.
+ // Thu gọn kích thước và giữ khoảng cách giữa vùng chạm để tránh nút đè nhau.
+ if(state==='play'){
+  const actionY=52*S;
+  button('Sổ công thức',W-132*S,actionY,90*S,27*S,()=>{codexOpen=true;},'#b08af0');
+  button('Ⅱ',W-68*S,actionY,28*S,27*S,()=>togglePause(),'#e6b35a');
+  button('⚙',W-31*S,actionY,28*S,27*S,()=>openSettings('play'),'#8ecbff');
+ }
 
  if(toastTimer > 0){
   toastTimer -= 0.016;
@@ -1714,25 +1714,25 @@ function drawOverlay(){
  ctx.globalAlpha=a;
  const cx=W/2,cy=H*.36;
  if(state==='menu'){
-  const compact=H<700;
+  const compact=H<760;
   const bob=Math.sin(tAll*2)*Math.min(6*S,H*.008);
   const titleSize=Math.min(32*S,W*.085,H*.065);
-  const titleY=compact?H*.105:H*.13;
+  const titleY=compact?H*.085:H*.105;
   txt('Hệ Sinh Thái',cx,titleY+bob,titleSize,'#bfffd0','center','800');
   txt('Hành Tinh Xanh',cx,titleY+titleSize*1.08+bob,titleSize,'#bfffd0','center','800');
   txt('Dùng thấu kính mặt trời và phản ứng hóa học.',cx,titleY+titleSize*1.8+8*S,Math.min(13*S,W*.035),'rgba(255,255,255,.85)','center','500');
 
   const pulse=0.94 + 0.06*Math.sin(tAll*4);
-  const mainW=Math.min(220*S,W*.76), buttonH=Math.min(42*S,H*.065);
-  const ys=compact?[.48,.57,.66,.75,.84]:[.49,.59,.69,.79,.87];
+  const mainW=Math.min(280*S,W*.78), buttonH=Math.min(42*S,H*(compact?.055:.052));
+  const ys=compact?[.37,.46,.55,.64,.73]:[.42,.51,.60,.69,.78];
   button('Bắt đầu',cx,H*ys[0],mainW,buttonH,()=>state='select');
   button('Phòng thí nghiệm',cx,H*ys[1],mainW,buttonH,()=>startLevel(0,true),'#7fe3a0');
   button('Chơi vô tận',cx,H*ys[2],mainW,buttonH,()=>startLevel(0,false,true),'#e6b35a');
   button('Sổ công thức',cx,H*ys[3],mainW,buttonH,()=>codexOpen=true,'#b08af0');
-  button('Cài đặt',cx,H*.925,Math.min(145*S,W*.44),Math.min(30*S,H*.048),()=>openSettings('menu'),'#8ecbff');
+  button('Cài đặt',cx,H*(compact?.82:.86),Math.min(145*S,W*.44),Math.min(30*S,H*.045),()=>openSettings('menu'),'#8ecbff');
   button('Thi đấu trực tuyến',cx,H*ys[4],mainW,buttonH,()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;},onlineEnabled()?'#6fd68a':'#53636d');
   ctx.fillStyle=onlineEnabled()?'#42d987':'#6b7a82';circ(ctx,cx-mainW*.42,H*ys[4],4*S);
-  const bottomY=H*.95,halfGap=Math.min(8*S,W*.025),smallW=Math.min((W-24*S-halfGap)/2,mainW*.52),smallH=Math.min(34*S,H*.055);
+  const bottomY=H*(compact?.91:.94),halfGap=Math.min(8*S,W*.025),smallW=Math.min((W-24*S-halfGap)/2,mainW*.52),smallH=Math.min(34*S,H*(compact?.05:.045));
   button('Bảng xếp hạng',cx-smallW/2-halfGap/2,bottomY,smallW,smallH,()=>openLeaderboard(0),'#8ecbff');
   button('BXH vô tận',cx+smallW/2+halfGap/2,bottomY,smallW,smallH,()=>openLeaderboard(12),'#e6b35a');
  }else if(state==='settings'){
@@ -2021,7 +2021,6 @@ function frame(ts){
 
   if(flash>0){ctx.fillStyle='rgba(255,255,255,'+(flash*.65)+')';ctx.fillRect(0,0,W,H);}
   if(textReady){if(state==='play'||state==='paused'||state==='collapse'){drawHUD();drawControls();}if(roomCode&&roomData&&roomData.status==='playing'&&state==='play')drawRaceHud();drawOverlay();if(state==='play')drawKeyboardHints();
-    if(state==='paused'){ctx.fillStyle='rgba(3,8,14,.82)';ctx.fillRect(0,0,W,H);txt('Đã tạm dừng',W/2,H*.42,28*S,'#bfffd0','center','800');txt(pauseReason||'Nhấn Space để tiếp tục',W/2,H*.48,14*S,'#fff','center','500');button('Tiếp tục',W/2,H*.58,150*S,44*S,togglePause,'#7fe3a0');button('Chơi lại',W/2,H*.67,150*S,40*S,()=>startLevel(lvl,isSandbox),'#ffd36b');}
    }
 
   if(codexOpen) drawCodex();
