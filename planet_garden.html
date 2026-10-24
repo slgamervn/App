@@ -104,7 +104,15 @@ const reducedMotionDefault=!!(window.matchMedia&&window.matchMedia('(prefers-red
 let settings=(()=>{let x=loadStore('p_settings',{});if(!x||typeof x!=='object'||Array.isArray(x))x={};return {quality:['auto','low','medium','high'].includes(x.quality)?x.quality:'auto',music:clamp(x.music===undefined?.35:x.music,0,1),effects:clamp(x.effects===undefined?.65:x.effects,0,1),muteMusic:!!x.muteMusic,muteEffects:!!x.muteEffects,reduced:typeof x.reduced==='boolean'?x.reduced:reducedMotionDefault,colorblind:!!x.colorblind,largeText:!!x.largeText,uiScale:clamp(x.uiScale===undefined?1:x.uiScale,.8,1.3),showFps:!!x.showFps,tutorialSeen:!!x.tutorialSeen,losses:x.losses&&typeof x.losses==='object'?x.losses:{}}})();
 function saveSettings(){saveStore('p_settings',settings);muted=settings.muteEffects;saveStore('p_muted',muted);}
 let tutorialActive=false,tutorialIndex=0;
-const TUTORIAL_STEPS=['Kéo thanh Góc chiếu để di chuyển vùng nắng.','Điều chỉnh Tiêu cự để đổi độ hội tụ ánh sáng.','Quan sát các chỉ số Nhiệt độ và Nước trên bảng đầu màn hình.','Khi hơi nước tích tụ, mây và mưa sẽ xuất hiện.','Đọc mục tiêu ở đầu màn hình rồi cân bằng hệ sinh thái.'];
+const TUTORIAL_STEPS=[
+ {title:'1. Điều khiển ánh sáng',body:'Kéo thanh Góc chiếu để di chuyển vùng nắng trên bản đồ. Kéo Tiêu cự để thay đổi độ tập trung của ánh sáng.'},
+ {title:'2. Chạm vào ô đất',body:'Chạm vào ô trên hành tinh để dùng công cụ đang chọn. Hạt giúp cây phát triển; Nước tăng độ ẩm; Ăn cỏ và Ăn thịt tạo các mắt xích trong chuỗi thức ăn.'},
+ {title:'3. Đọc các chỉ số',body:'Xem mục tiêu Cây, Ăn cỏ, Ăn thịt ở đầu màn hình. Mở Môi trường để xem nhiệt độ, nước, hơi nước và các chỉ số hóa học khi có.'},
+ {title:'4. Giữ hành tinh cân bằng',body:'Nắng quá tập trung làm đất nóng và khô; thiếu năng lượng có thể khiến hành tinh lạnh. Hơi nước tích tụ có thể tạo mây và mưa. Điều chỉnh nhẹ, rồi quan sát phản ứng.'},
+ {title:'5. Hoàn thành màn chơi',body:'Đạt đủ số lượng sinh vật yêu cầu trước khi hết giờ và tránh để hệ sinh thái sụp đổ. Màn hóa học còn yêu cầu kiểm soát pH, O₂ và phản ứng an toàn.'},
+ {title:'6. Phòng thí nghiệm',body:'Chế độ tự do cho phép thử công cụ và thảm họa. Chọn công cụ ở hàng dưới; dùng mũi tên để chuyển trang khi có nhiều công cụ. Một số thảm họa có thời gian hồi chiêu.'},
+ {title:'7. Tạm dừng và trợ giúp',body:'Chạm nút Ⅱ ở góc trên để tạm dừng, tiếp tục hoặc chơi lại. Nút Lớp xem · O đổi lớp hiển thị; trên máy tính có thể nhấn phím O. Mở Cài đặt → Xem lại hướng dẫn để xem lại bất cứ lúc nào.'}
+];
 let chemDebugLast=null;
 let toastMsg = '', toastTimer = 0;
 // Stage 9: cached overlays, sandbox disaster tools and shareable failure stories.
@@ -1452,7 +1460,24 @@ function drawSettings(){
 }
 
 function applyAudioSettings(){muted=settings.muteEffects;if(master&&AC)master.gain.setTargetAtTime(settings.muteEffects?0:settings.effects,AC.currentTime,.03);if(ambientGain)ambientGain.gain.setTargetAtTime(settings.muteMusic?0:settings.music,AC.currentTime,.03);}
-function drawTutorial(){if(!tutorialActive)return;ctx.fillStyle='rgba(3,8,14,.76)';ctx.fillRect(0,0,W,H);rr(ctx,W*.09,H*.32,W*.82,H*.30,16*S);ctx.fillStyle='#14283a';ctx.fill();ctx.strokeStyle='#7fe3a0';ctx.stroke();txt('Hướng dẫn '+(tutorialIndex+1)+'/5',W/2,H*.38,19*S,'#bfffd0','center','800');txt(TUTORIAL_STEPS[tutorialIndex],W/2,H*.46,Math.max(12*S,13*S*(settings.largeText?1.25:1)),'#fff','center','600');button(tutorialIndex===4?'Bắt đầu chơi':'Tiếp tục',W*.58,H*.56,130*S,36*S,()=>{tutorialIndex++;if(tutorialIndex>=TUTORIAL_STEPS.length){tutorialActive=false;settings.tutorialSeen=true;saveSettings();}},'#7fe3a0');button('Bỏ qua',W*.35,H*.56,90*S,36*S,()=>{tutorialActive=false;settings.tutorialSeen=true;saveSettings();},'#ff8a8a');}
+function drawTutorial(){
+ if(!tutorialActive)return;
+ const step=TUTORIAL_STEPS[clamp(tutorialIndex,0,TUTORIAL_STEPS.length-1)];
+ const phone=W<700,boxW=Math.min(W-28*S,560*S),boxH=Math.min(H-32*S,phone?Math.max(290*S,H*.52):300*S),boxX=(W-boxW)/2,boxY=(H-boxH)/2;
+ ctx.fillStyle='rgba(3,8,14,.82)';ctx.fillRect(0,0,W,H);
+ rr(ctx,boxX,boxY,boxW,boxH,18*S);ctx.fillStyle='#14283a';ctx.fill();ctx.strokeStyle='#7fe3a0';ctx.lineWidth=1.5*S;ctx.stroke();
+ txt('HƯỚNG DẪN CHƠI',W/2,boxY+30*S,Math.max(15*S,UI.type.title*S*.85),'#bfffd0','center','800');
+ txt(step.title,W/2,boxY+68*S,Math.max(14*S,UI.type.bodyLg*S*.9),'#ffffff','center','800');
+ const fontSize=Math.max(12*S,UI.type.body*S*(settings.largeText?1.15:1));
+ ctx.save();ctx.font='600 '+fontSize+'px '+UI.font;ctx.fillStyle='#e5f0f0';ctx.textAlign='left';ctx.textBaseline='middle';
+ const words=step.body.split(/\s+/),maxWidth=boxW-34*S,lineH=fontSize*1.55,lines=[];let line='';
+ for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);
+ const maxLines=Math.max(2,Math.floor((boxH-130*S)/lineH)),shown=lines.slice(0,maxLines);if(lines.length>maxLines&&shown.length)shown[shown.length-1]=shown[shown.length-1].replace(/[.,;:]?$/,'…');
+ const textY=boxY+95*S+(boxH-140*S-shown.length*lineH)/2;shown.forEach((line,i)=>ctx.fillText(line,boxX+17*S,textY+i*lineH));ctx.restore();
+ txt((tutorialIndex+1)+' / '+TUTORIAL_STEPS.length,W/2,boxY+boxH-58*S,UI.type.caption,'#b8c9cb','center','700');
+ button(tutorialIndex===TUTORIAL_STEPS.length-1?'Bắt đầu chơi':'Tiếp tục',W*.59,boxY+boxH-28*S,Math.min(140*S,boxW*.34),38*S,()=>{tutorialIndex++;if(tutorialIndex>=TUTORIAL_STEPS.length){tutorialActive=false;settings.tutorialSeen=true;saveSettings();}},'#7fe3a0');
+ button('Bỏ qua',W*.36,boxY+boxH-28*S,Math.min(100*S,boxW*.28),38*S,()=>{tutorialActive=false;settings.tutorialSeen=true;saveSettings();},'#ff8a8a');
+}
 function drawOverlay(){
  if(state==='play'||state==='collapse')return;
  const a=Math.min(1,stateT*3);
@@ -1470,10 +1495,12 @@ function drawOverlay(){
   button('Phòng thí nghiệm',cx,base+bh/2+gap+bh/2,bw,bh,()=>startLevel(0,true),UI.color.surfaceSoft);
   const onlineAvailable=typeof onlineEnabled==='function'&&onlineEnabled();
   button(onlineAvailable?'Online':'Online · Chưa khả dụng',cx,base+(bh+gap)*2,bw,bh,()=>{if(onlineAvailable){state='online';stateT=0;}else triggerToast('Online hiện chưa khả dụng.');},onlineAvailable?UI.color.water:UI.color.surfaceSoft);
-  const utilityY=Math.min(H-62*S,base+(bh+gap)*3+8*S),uw=Math.min(100*S,(W-44*S)/3),uh=48*S;
-  button('Sổ công thức',cx-uw-6*S,utilityY,uw,uh,()=>{codexOpen=true;},'#9b83cf');
-  button('Xếp hạng',cx,utilityY,uw,uh,()=>openLeaderboard(0),UI.color.surfaceSoft);
-  button('Cài đặt',cx+uw+6*S,utilityY,uw,uh,()=>{settingsReturn='menu';settingsOpen=true;},UI.color.surfaceSoft);
+  const utilityY=Math.min(H-62*S,base+(bh+gap)*3+8*S),uw=Math.min(84*S,(W-48*S)/4),uh=48*S,utilityGap=4*S;
+  const utilityStart=cx-(uw*2+utilityGap*1.5);
+  button('Hướng dẫn',utilityStart,utilityY,uw,uh,()=>{startLevel(0);tutorialActive=true;tutorialIndex=0;},UI.color.life);
+  button('Sổ CT',utilityStart+uw+utilityGap,utilityY,uw,uh,()=>{codexOpen=true;},'#9b83cf');
+  button('Xếp hạng',utilityStart+(uw+utilityGap)*2,utilityY,uw,uh,()=>openLeaderboard(0),UI.color.surfaceSoft);
+  button('Cài đặt',utilityStart+(uw+utilityGap)*3,utilityY,uw,uh,()=>{settingsReturn='menu';settingsOpen=true;},UI.color.surfaceSoft);
  }else if(state==='paused'){
   uiPanel(W*.06,H*.28,W*.88,H*.52,UI.radius.panel*S);
   uiText('MÔ PHỎNG ĐANG DỪNG',cx,H*.36,UI.type.title,UI.color.text,'center','bold');
