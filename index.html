@@ -211,14 +211,14 @@ function drawTutorial(){
  const phone=W<700,bw=Math.min(W-24*S,560*S),bh=Math.min(H-24*S,phone?Math.max(360*S,H*.76):350*S),bx=(W-bw)/2,by=(H-bh)/2;
  ctx.fillStyle='rgba(2,8,14,.86)';ctx.fillRect(0,0,W,H);
  rr(ctx,bx,by,bw,bh,18*S);ctx.fillStyle='#14283a';ctx.fill();ctx.strokeStyle='#7fe3a0';ctx.lineWidth=1.5*S;ctx.stroke();
- txt('HƯỚNG DẪN CHƠI',W/2,by+29*S,Math.max(15*S,UI.type.title*S*.82),'#bfffd0','center','800');
- txt(TUTORIAL_STEPS[tutorialIndex].title,W/2,by+65*S,Math.max(14*S,UI.type.bodyLg*S*.9),'#fff','center','800');
- const fs=Math.max(12*S,UI.type.body*S*(settings.largeText?1.12:1)),maxW=bw-34*S,lh=fs*1.5;ctx.save();ctx.font='600 '+fs+'px '+UI.font;ctx.fillStyle='#e5f0f0';ctx.textAlign='left';ctx.textBaseline='top';
+ txt('HƯỚNG DẪN CHƠI',W/2,by+29*S,Math.max(15*S,20*S),'#bfffd0','center','800');
+ txt(TUTORIAL_STEPS[tutorialIndex].title,W/2,by+65*S,Math.max(14*S,17*S),'#fff','center','800');
+ const fs=Math.max(12*S,15*S*(settings.largeText?1.12:1)),maxW=bw-34*S,lh=fs*1.5;ctx.save();ctx.font='600 '+fs+'px '+FONT_STACK;ctx.fillStyle='#e5f0f0';ctx.textAlign='left';ctx.textBaseline='top';
  const lines=[];let line='';for(const word of TUTORIAL_STEPS[tutorialIndex].body.split(/\s+/)){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxW&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);
  lines.slice(0,Math.max(3,Math.floor((bh-174*S)/lh))).forEach((v,i)=>ctx.fillText(v,bx+17*S,by+91*S+i*lh));ctx.restore();
- txt((tutorialIndex+1)+' / '+TUTORIAL_STEPS.length,W/2,by+bh-65*S,UI.type.caption,'#b8c9cb','center','700');
+ txt((tutorialIndex+1)+' / '+TUTORIAL_STEPS.length,W/2,by+bh-65*S,12*S,'#b8c9cb','center','700');
  button(tutorialIndex===TUTORIAL_STEPS.length-1?'Bắt đầu chơi':'Tiếp tục',bx+bw*.66,by+bh-29*S,Math.min(145*S,bw*.42),40*S,()=>{if(tutorialIndex<TUTORIAL_STEPS.length-1)tutorialIndex++;else{tutorialActive=false;tutorialSeen=true;saveStore('p_tutorial_seen',true);}},'#7fe3a0');
- button('Bỏ qua',bx+bw*.30,by+bh-29*S,Math.min(100*S,bw*.30),40*S,()=>{tutorialActive=false;tutorialSeen=true;saveStore('p_tutorial_seen',true);},'#ff8a8a');
+ button('Đóng ✕',bx+bw*.30,by+bh-29*S,Math.min(100*S,bw*.30),40*S,()=>{tutorialActive=false;tutorialSeen=true;saveStore('p_tutorial_seen',true);},'#ff8a8a');
 }
 
 
