@@ -1762,7 +1762,8 @@ function drawOverlay(){
    ['Phòng thí nghiệm','#337f69',()=>startLevel(0,true)],
    ['Chơi vô tận','#dcae56',()=>startLevel(0,false,true)],
    ['Sổ công thức','#a982e8',()=>codexOpen=true],
-   ['Thi đấu trực tuyến',onlineEnabled()?'#398b68':'#455a62',()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;}]
+   ['Thi đấu trực tuyến',onlineEnabled()?'#398b68':'#455a62',()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;}],
+   ['Hướng dẫn chơi','#4b9fc2',()=>{tutorialIndex=0;tutorialActive=true;}]
   ];
   const maxMenuBottom=H-(compact?126*S:135*S);
   const available=Math.max(bh*menuItems.length, maxMenuBottom-mainStart);
