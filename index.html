@@ -1755,9 +1755,9 @@ function drawOverlay(){
 
 // ---------- Input Handling ----------
 let drag=null, pendingSliderValue=null, hoverPoint=null;
-function ptr(e){if(!canvasRect)canvasRect=cv.getBoundingClientRect();const r=canvasRect;return [(e.clientX-r.left)*(VIEWW/r.width)-gameOffset,(e.clientY-r.top)*(H/r.height)];}
+function ptr(e){const r=cv.getBoundingClientRect();canvasRect=r;return [(e.clientX-r.left)*(VIEWW/Math.max(1,r.width))-gameOffset,(e.clientY-r.top)*(H/Math.max(1,r.height))];}
 function setSlider(i,x){const sl=controlLayout.sliders[i];if(!sl)return;const v=clamp((x-sl.x0)/(sl.x1-sl.x0),0,1);if(i===0){if(Math.abs(s1-v)>0.00001){s1=v;unlockFormula(1);}}else s2=v;}
-function hitButton(x,y){for(const b of btns)if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h)return b;return null;}
+function hitButton(x,y){let best=null,bestScore=Infinity;for(const b of btns){if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){const score=Math.hypot(x-(b.x+b.w/2),y-(b.y+b.h/2));if(score<bestScore){best=b;bestScore=score;}}}return best;}
 function hitInputControl(x,y){
  let best=null,bestScore=Infinity;
  for(const sl of controlLayout.sliders){const r=sl.track;if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h){const score=Math.abs(y-sl.y);if(score<bestScore){best={type:'slider',control:sl};bestScore=score;}}}
@@ -1767,7 +1767,7 @@ function hitInputControl(x,y){
 }
 
 cv.addEventListener('pointerdown',e=>{
- e.preventDefault();initAudio();
+ e.preventDefault();try{cv.setPointerCapture(e.pointerId);}catch(_){}initAudio();
  const p=ptr(e),x=p[0],y=p[1];
  if(codexOpen){let codexTarget=null,codexBest=Infinity;for(let i=codexButtonStart;i<btns.length;i++){const b=btns[i];if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){const score=Math.hypot(x-(b.x+b.w/2),y-(b.y+b.h/2));if(score<codexBest){codexBest=score;codexTarget=b;}}}if(codexTarget){codexTarget.fn();return;}codexOpen=false;return;}
  if(minigameData){
