@@ -376,7 +376,7 @@ function drawRaceHud(){if(!roomCode||!roomData||roomData.status!=='playing')retu
 
 // ---------- Ecosystem & Chemistry Simulation ----------
 function hotspot(t){
- const f=s2,r=3-1.8*f,peak=.6+.9*f;
+ const f=clamp(s2,0,1),r=4.8-3.3*f,peak=.6+.9*f;
  let x=s1*7;
  if(!isSandbox && LEVELS[lvl] && LEVELS[lvl].drift){const u=(t*0.4)%12;x+=u<3?u:(u<9?6-u:u-12);}
  x=clamp(x,-1,8);
@@ -1210,7 +1210,8 @@ function drawWorld(){
  beamGrad.addColorStop(0, 'rgba(255,230,150,0.35)');
  beamGrad.addColorStop(1, 'rgba(255,180,80,0.02)');
  ctx.fillStyle=beamGrad;
- ctx.beginPath(); ctx.moveTo(lensX-15*S, lensY); ctx.lineTo(lensX+15*S, lensY); ctx.lineTo(hx+tw*1.8, hy); ctx.lineTo(hx-tw*1.8, hy); ctx.closePath(); ctx.fill();
+ const beamHalfWidth=Math.min(tw*4.4,Math.max(tw*1.8,(hs.r+1)*tw*.707));
+ ctx.beginPath(); ctx.moveTo(lensX-15*S, lensY); ctx.lineTo(lensX+15*S, lensY); ctx.lineTo(hx+beamHalfWidth, hy); ctx.lineTo(hx-beamHalfWidth, hy); ctx.closePath(); ctx.fill();
 
  const Rh=(hs.r+.6)*tw*.707;
  ctx.save();
@@ -1377,7 +1378,7 @@ function drawHUD(){
  }
 }
 
-const sliderY=i=>H-(isSandbox?165*S:(LEVELS[lvl]&&LEVELS[lvl].chem?155*S:130*S))+i*55*S;
+const sliderY=i=>H-(isSandbox?235*S:(LEVELS[lvl]&&LEVELS[lvl].chem?230*S:195*S))+i*50*S;
 
 function layoutControls(){
  const x0=35*S,x1=W-35*S;
@@ -1426,7 +1427,7 @@ function drawControls(){
    tools.push({id:'volcano', label:'Núi lửa'});
    tools.push({id:'limestone', label:'Đá vôi'});
   }
-  const bw=(W - 30*S)/tools.length, by=H - 45*S;
+  const bw=(W - 30*S)/tools.length, by=H - 70*S;
   tools.forEach((t, i)=>{
    const bx=15*S + i*bw, sel=sbTool===t.id;
    button(t.label, bx+bw/2, by, bw-3*S, 36*S, ()=>{ sbTool=t.id; }, sel?'#7fe3a0':'#3d5a73');
@@ -1439,7 +1440,7 @@ function drawControls(){
    {id:'carn', label:'Thịt'},
    {id:'storm', label:'Bão'}
   ];
-  const bw=(W - 40*S)/5, by=H - 45*S;
+  const bw=(W - 40*S)/5, by=H - 70*S;
   tools.forEach((t, i)=>{
    const bx=20*S + i*bw, sel=sbTool===t.id;
    button(t.label, bx+bw/2, by, bw-4*S, 36*S, ()=>{ sbTool=t.id; }, sel?'#7fe3a0':'#3d5a73');
