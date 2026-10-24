@@ -1765,9 +1765,9 @@ function drawOverlay(){
    ['Thi đấu trực tuyến',onlineEnabled()?'#398b68':'#455a62',()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;}]
   ];
   const maxMenuBottom=H-(compact?126*S:135*S);
-  const available=Math.max(bh*5, maxMenuBottom-mainStart);
-  const itemGap=Math.min(gap,Math.max(3*S,(available-bh*5)/4));
-  const total=bh*5+itemGap*4;
+  const available=Math.max(bh*menuItems.length, maxMenuBottom-mainStart);
+  const itemGap=Math.min(gap,Math.max(3*S,(available-bh*menuItems.length)/(menuItems.length-1)));
+  const total=bh*menuItems.length+itemGap*(menuItems.length-1);
   const actualStart=Math.min(mainStart, maxMenuBottom-total);
   menuItems.forEach((it,i)=>{
    const y=actualStart+i*(bh+itemGap);
