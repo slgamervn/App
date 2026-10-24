@@ -202,9 +202,8 @@ const lay={tw:40,th:20,ox:0,oy:0,cx:0,cy:0,hudH:134,top:134,bot:400};
 
 function resize(){
  canvasRect=null;
- const vv=window.visualViewport;
- const vw=Math.max(1,Math.round(vv?vv.width:window.innerWidth));
- const vh=Math.max(1,Math.round(vv?vv.height:window.innerHeight));
+ const vw=Math.max(1,Math.round(window.innerWidth||document.documentElement.clientWidth));
+ const vh=Math.max(1,Math.round(window.innerHeight||document.documentElement.clientHeight));
  DPR=Math.min(window.devicePixelRatio||1,(vw>1440?1.5:2));
  VIEWW=vw;H=vh;
  W=(vw/vh>1.1)?Math.min(vw,1100):vw;
@@ -397,7 +396,7 @@ function roomPath(suffix=''){return 'rooms/'+roomCode+(suffix?'/'+suffix.replace
 function playerPath(suffix=''){return roomPath('players/'+playerId+(suffix?'/'+suffix:''));}
 async function setPlayerName(v){const n=safeText(v,12);playerName=n||('Khach'+String(100+Math.floor(Math.random()*900)));try{localStorage.setItem('pg_online_name',playerName);}catch(_){}return playerName;}
 function showTextInput(purpose,value,maxLength=12){inputPurpose=purpose;inputValue=value||'';if(!inputOverlay){inputOverlay=document.createElement('input');inputOverlay.type='text';inputOverlay.autocomplete='off';inputOverlay.autocapitalize='off';inputOverlay.spellcheck=false;inputOverlay.style.cssText='position:fixed;z-index:20;display:none;box-sizing:border-box;padding:12px 14px;border:1px solid #66d9a5;border-radius:12px;background:#0b1822;color:#e9fff2;font-family:'+FONT_STACK+';font-size:16px;outline:none;';document.body.appendChild(inputOverlay);inputOverlay.addEventListener('input',()=>{inputOverlay.value=inputPurpose==='roomcode'?inputOverlay.value.toUpperCase().replace(/[^23456789ABCDEFGHJKLMNPQRSTUVWXYZ]/g,'').slice(0,4):safeText(inputOverlay.value,12);});inputOverlay.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();confirmTextInput();}if(e.key==='Escape'){e.preventDefault();e.stopPropagation();hideTextInput();state='online';stateT=0;}});}inputOverlay.maxLength=maxLength;inputOverlay.value=inputValue;inputOverlay.style.display='block';positionTextInput();setTimeout(()=>{try{inputOverlay.focus();inputOverlay.select();}catch(_){}},0);}
-function positionTextInput(){if(!inputOverlay||inputOverlay.style.display==='none')return;const r=cv.getBoundingClientRect();const sx=r.width/Math.max(1,VIEWW),sy=r.height/Math.max(1,H);const w=Math.min(W*.72,360),x=gameOffset+(W-w)/2,y=H*.49;inputOverlay.style.left=(r.left+x*sx)+'px';inputOverlay.style.top=(r.top+y*sy)+'px';inputOverlay.style.width=(w*sx)+'px';inputOverlay.style.height=(50*sy)+'px';}
+function positionTextInput(){if(!inputOverlay||inputOverlay.style.display==='none')return;const vv=window.visualViewport;const vw=Math.max(1,vv?vv.width:window.innerWidth),vh=Math.max(1,vv?vv.height:window.innerHeight);const ox=vv?vv.offsetLeft:0,oy=vv?vv.offsetTop:0;const w=Math.min(360,Math.max(220,vw-32));inputOverlay.style.position='fixed';inputOverlay.style.left=Math.round(ox+(vw-w)/2)+'px';inputOverlay.style.top=Math.round(oy+Math.max(12,Math.min(vh-66,(vh-50)/2)))+'px';inputOverlay.style.width=Math.round(w)+'px';inputOverlay.style.height='50px';inputOverlay.style.fontSize='16px';inputOverlay.style.zIndex='2147483647';}
 function hideTextInput(){if(inputOverlay){inputOverlay.style.display='none';try{inputOverlay.blur();}catch(_){}}inputPurpose='';}
 async function confirmTextInput(){const v=inputOverlay?inputOverlay.value:inputValue,purpose=inputPurpose;hideTextInput();if(purpose==='name'){await setPlayerName(v);state='online';}else if(purpose==='roomcode'){await joinRoom(v.toUpperCase());}stateT=0;}
 async function submitLeaderboard(){if(!dbBase()||!onlineScorePayload)return false;if(!onlineReachable&&!await probeOnline()){onlineScoreRetry=true;return false;}if(onlineScoreSent&&!onlineScoreRetry)return true;onlineScoreSent=false;onlineScoreRetry=false;const v=await dbPush('lb/'+lvl,onlineScorePayload);if(v&&typeof v.name==='string'){onlineScoreKey=v.name;onlineScoreSent=true;return true;}onlineScoreRetry=true;return false;}
@@ -1965,7 +1964,7 @@ function frame(ts){
 let resizeTimer=0;
 const scheduleResize=()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(resize,100);};
 window.addEventListener('resize',scheduleResize);window.addEventListener('orientationchange',scheduleResize);window.addEventListener('scroll',()=>{canvasRect=cv.getBoundingClientRect();},{passive:true});
-if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>{scheduleResize();positionTextInput();});window.visualViewport.addEventListener('scroll',()=>{canvasRect=cv.getBoundingClientRect();positionTextInput();},{passive:true});}
+if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>{positionTextInput();});window.visualViewport.addEventListener('scroll',()=>{positionTextInput();},{passive:true});}
 resize();
 state='menu';stateT=0;
 if(dbConfigured())probeOnline().then(()=>{});else{onlineReachable=false;onlineNote=ONLINE_OFFLINE_NOTE;}
