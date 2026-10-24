@@ -79,7 +79,7 @@ function loadStore(k,def){try{const v=localStorage.getItem(k);return v!==null?JS
 function saveStore(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 
 let W=0,H=0,DPR=1,S=1,VIEWW=0,gameOffset=0,canvasRect=null;
-let state='menu',stateT=0,lvl=0,loseMsg='',unlockedLvl=loadStore('p_unlocked',0),levelStars=loadStore('p_stars',[0,0,0,0,0,0,0,0,0,0,0,0]);
+let state='menu',stateT=0,lvl=0,loseMsg='',isEndless=false,unlockedLvl=loadStore('p_unlocked',0),levelStars=loadStore('p_stars',[0,0,0,0,0,0,0,0,0,0,0,0]);
 const ONLINE_ALPHABET='23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 function safeText(v,max=24){if(typeof v!=='string')return '';try{return v.normalize('NFC').replace(/[\u0000-\u001f\u007f]/g,'').replace(/[^\p{L}\p{N} ]/gu,'').trim().slice(0,max);}catch(_){return v.replace(/[^A-Za-z0-9 ]/g,'').trim().slice(0,max);}}
 function randomId(){let out='';for(let i=0;i<8;i++)out+=ONLINE_ALPHABET[(Math.random()*ONLINE_ALPHABET.length)|0];return out;}
@@ -455,8 +455,8 @@ function lightAt(h,x,y){
  return clamp(l,0,10);
 }
 
-function startLevel(i, sandbox=false){
- isSandbox=sandbox;lvl=clamp(i,0,11);if(roomCode&&roomData&&roomData.status==='playing'&&raceSeed!==null)seedRandom(raceSeed);else{raceSeed=null;seedRandom((Math.random()*4294967296)>>>0);onlineScorePayload=null;onlineScoreSent=false;onlineScoreRetry=false;}const L=LEVELS[lvl]||LEVELS[0];
+function startLevel(i, sandbox=false, endless=false){
+ isSandbox=sandbox;isEndless=!!endless;lvl=clamp(i,0,11);if(roomCode&&roomData&&roomData.status==='playing'&&raceSeed!==null)seedRandom(raceSeed);else{raceSeed=null;seedRandom((Math.random()*4294967296)>>>0);onlineScorePayload=null;onlineScoreSent=false;onlineScoreRetry=false;}const L=LEVELS[lvl]||LEVELS[0];
  tiles=[];
  for(let k=0;k<64;k++){
   let isLime = false;
@@ -796,7 +796,7 @@ function tick(){
  let dc=0;for(const t of tiles)if(t.des)dc++;
  if(dc>25.6){triggerCollapse(h);return;}
  ticks++;
- if(!isSandbox && ticks>=TT)finish();
+ if(!isSandbox && !isEndless && ticks>=TT)finish();
 }
 
 function finish(){
@@ -1709,6 +1709,7 @@ function drawOverlay(){
   const pulse=0.85 + 0.15*Math.sin(tAll*4);
   button('Bắt đầu',cx,H*.64,200*S*pulse,50*S*pulse,()=>state='select');
   button('Phòng thí nghiệm',cx,H*.73,200*S,42*S,()=>startLevel(0, true),'#7fe3a0');
+  button('Chơi vô tận',cx,H*.78,200*S,40*S,()=>startLevel(0,false,true),'#e6b35a');
   button('Sổ công thức',cx,H*.82,200*S,40*S,()=>codexOpen=true,'#b08af0');
   button('Thi đấu trực tuyến',cx,H*.89,200*S,38*S,()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;},onlineEnabled()?'#6fd68a':'#53636d');ctx.fillStyle=onlineEnabled()?'#42d987':'#6b7a82';circ(ctx,cx-88*S,H*.89,4*S);button('Bảng xếp hạng',cx,H*.96,170*S,34*S,()=>{if(onlineEnabled())openLeaderboard(0);else{state='online';onlineNote=ONLINE_OFFLINE_NOTE;}},onlineEnabled()?'#8ecbff':'#53636d');
  }else if(state==='select'){
