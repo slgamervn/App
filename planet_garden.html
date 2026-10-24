@@ -91,7 +91,7 @@ let minigameData=null; // For Equation Balancing Mini-game
 
 // Codex State
 let codexUnlocked = Array.isArray(loadStore('p_codex', [])) ? loadStore('p_codex', []).filter(Number.isInteger).map(i=>i===14?14:i) : [];
-let codexOpen = false, codexTab = 0; // Vật lý, Hóa học, Sinh học
+let codexOpen = false, codexTab = 0, codexPage = 0, codexSelected = 0; // Vật lý, Hóa học, Sinh học
 // Stage 10 — design system tokens (scene-art colors remain intentionally independent).
 const UI={space:{xs:4,sm:8,md:16,lg:24,xl:32},radius:{chip:12,panel:20,pill:999},type:{caption:12,body:14,bodyLg:16,title:20,hero:28,display:40},line:1.35,font:'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',color:{surface:'rgba(13,30,42,.94)',surfaceSoft:'rgba(17,39,51,.82)',border:'rgba(218,242,239,.22)',text:'#f2f8f6',dim:'#b8c9cb',heat:'#f4bd63',life:'#83e0b0',water:'#7dc9ed',danger:'#ff8b82',success:'#70d7a0',focus:'#fff0a8',ink:'#10242b'}};
 const uiScaleDefault=1;
@@ -191,8 +191,8 @@ const EQUATIONS = [
  {q:'Ca(OH)2 + H2SO3 → CaSO3 + H2O',name:'Trung hòa axit',reward:'lime',formulas:['Ca(OH)2','H2SO3','CaSO3','H2O']}
 ];
 
-function startMinigame(onFinish){
- const eq = pick(EQUATIONS);
+function startMinigame(onFinish, preferredEq=null){
+ const eq = preferredEq || pick(EQUATIONS);
  let userVals = new Array(eq.formulas.length).fill(1);
  minigameData = {eq:eq, vals:userVals, onFinish:onFinish, status:null};
 }
@@ -1328,50 +1328,59 @@ function button(label,cx,cy,w,h,fn,col){
  ctx.restore();
 }
 
-// ---------- Codex Overlay ----------
-function drawCodex(){
- if(!codexOpen) return;
- ctx.fillStyle='rgba(6,11,17,0.92)'; ctx.fillRect(0,0,W,H);
-
- const cx=W/2, cy=H/2;
- rr(ctx, W*0.08, H*0.08, W*0.84, H*0.84, 20*S);
- ctx.fillStyle='#122232'; ctx.fill();
- ctx.strokeStyle='#3d5a73'; ctx.lineWidth=2; ctx.stroke();
-
- txt('Sổ công thức',cx,H*.12,Math.min(20*S,W*.05),'#bfffd0','center','800');
- const unlockedCount=codexUnlocked.length;txt('Đã mở: '+unlockedCount+'/'+CODEX_ENTRIES.length,cx,H*.155,12*S,'#ffe28a','center','600');
-
- const tabs=['Vật lý','Hóa học','Sinh học'];
- const tw=W*.27,ty=H*.205;
- tabs.forEach((tb, i)=>{
-  const tx = W*0.14 + i * (tw + W*0.04);
-  const sel = codexTab === i;
-  button(tb, tx + tw/2, ty, tw, 32*S, ()=>{ codexTab = i; }, sel?'#7fe3a0':'#2c4058');
+// --function drawCodex(){
+ if(!codexOpen)return;
+ ctx.fillStyle='rgba(4,10,17,.94)';ctx.fillRect(0,0,W,H);
+ const phone=W<700,cx=W/2,pw=Math.min(W-20*S,720*S),px=(W-pw)/2,py=16*S,ph=H-32*S;
+ uiPanel(px,py,pw,ph,UI.radius.panel*S);
+ uiText('SỔ CÔNG THỨC',cx,py+28*S,UI.type.title,UI.color.life,'center','bold');
+ uiText('Tra cứu công thức, xem cách áp dụng và luyện cân bằng phản ứng.',cx,py+51*S,Math.max(10*S,UI.type.caption*S*.9),UI.color.dim);
+ const tabs=['Vật lý','Hóa học','Sinh học'],tabY=py+78*S,tabW=(pw-32*S)/3;
+ tabs.forEach((name,i)=>button(name,px+16*S+tabW*(i+.5),tabY,tabW-5*S,36*S,()=>{codexTab=i;codexPage=0;codexSelected=(CODEX_ENTRIES.findIndex(e=>e.tab===i));},codexTab===i?UI.color.life:UI.color.surfaceSoft));
+ const entries=CODEX_ENTRIES.map((e,i)=>({e,i})).filter(x=>x.e.tab===codexTab);
+ const perPage=4,pages=Math.max(1,Math.ceil(entries.length/perPage));codexPage=clamp(codexPage,0,pages-1);
+ const rowTop=py+105*S,rowH=Math.min(43*S,Math.max(32*S,(ph*.34)/perPage));
+ const visible=entries.slice(codexPage*perPage,(codexPage+1)*perPage);
+ visible.forEach((item,j)=>{
+  const y=rowTop+j*rowH,selected=codexSelected===item.i,unlocked=codexUnlocked.includes(item.i);
+  uiPanel(px+12*S,y,pw-24*S,rowH-3*S,UI.radius.chip*S);
+  if(selected){ctx.save();ctx.strokeStyle=UI.color.life;ctx.lineWidth=2*S;rr(ctx,px+12*S,y,pw-24*S,rowH-3*S,UI.radius.chip*S);ctx.stroke();ctx.restore();}
+  const titleY=y+rowH*.34,formulaY=y+rowH*.70;
+  uiText(item.e.title,px+23*S,titleY,Math.max(10*S,UI.type.caption*S),selected?UI.color.life:UI.color.text,'left','bold');
+  uiText(item.e.formula,px+23*S,formulaY,Math.max(9*S,UI.type.caption*S*.88),UI.color.heat,'left','bold');
+  button(unlocked?'Đã mở':'Xem',px+pw-46*S,y+(rowH-3*S)/2,68*S,rowH-5*S,()=>{codexSelected=item.i;},unlocked?UI.color.success:UI.color.surfaceSoft);
+  // The full row remains tappable on touch screens.
+  btns.push({x:px+12*S,y,w:pw-24*S,h:rowH-3*S,fn:()=>{codexSelected=item.i;},label:item.e.title});
  });
-
- // Render entries
- const visible=CODEX_ENTRIES.map((e,i)=>({e,i})).filter(x=>x.e.tab===codexTab);
- const rowTop=H*.25,rowBottom=H*.78,rowH=(rowBottom-rowTop)/Math.max(1,visible.length);
- for(let i=0;i<visible.length;i++){
-  const entryIdx=visible[i].i;const entry=visible[i].e;
-  const unlocked = codexUnlocked.includes(entryIdx);
-  const ey=rowTop+i*rowH;
-
-  rr(ctx,W*.09,ey,W*.82,rowH-4*S,8*S);
-  ctx.fillStyle=unlocked?'#1b3248':'#101a24'; ctx.fill();
-  ctx.strokeStyle=unlocked?'#4c7a9c':'#223344'; ctx.stroke();
-
-  if(unlocked){
-   txt(entry.title,W*.12,ey+12*S,Math.min(10*S,W*.027),'#bfffd0','left','700');
-   txt(entry.formula,W*.12,ey+24*S,Math.min(9*S,W*.024),'#ffe28a','left','700');
-   txt(entry.desc,W*.12,ey+35*S,Math.min(7*S,W*.02),'rgba(255,255,255,.85)','left','500');
-   txt(entry.used||'',W*.12,ey+44*S,Math.min(6*S,W*.017),'#9ec9dd','left','500');
-  } else {
-   txt('[Đã khóa] Khám phá để mở', W*0.15, ey + 32*S, 13*S, 'rgba(255,255,255,0.4)', 'left', '600');
-  }
+ const selectedEntry=CODEX_ENTRIES[codexSelected]||entries[0]?.e;
+ const detailY=rowTop+perPage*rowH+8*S,detailH=Math.max(74*S,py+ph- detailY-62*S);
+ uiPanel(px+12*S,detailY,pw-24*S,detailH,UI.radius.chip*S);
+ if(selectedEntry){
+  uiText(selectedEntry.title,px+24*S,detailY+17*S,UI.type.body,UI.color.life,'left','bold');
+  uiText(selectedEntry.formula,px+24*S,detailY+38*S,Math.max(10*S,UI.type.body*S*.92),UI.color.heat,'left','bold');
+  const detailText=selectedEntry.desc+' '+selectedEntry.used;
+  ctx.save();const fs=Math.max(10*S,UI.type.caption*S*.88);ctx.font='500 '+fs+'px '+UI.font;ctx.fillStyle=UI.color.text;ctx.textAlign='left';ctx.textBaseline='top';
+  const maxW=pw-48*S,words=detailText.split(/\\s+/),lines=[];let line='';
+  for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxW&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);
+  const maxLines=Math.max(2,Math.floor((detailH-47*S)/(fs*1.35)));
+  lines.slice(0,maxLines).forEach((ln,i)=>ctx.fillText(ln,px+24*S,detailY+48*S+i*fs*1.35));
+  ctx.restore();
+  uiText(codexUnlocked.includes(codexSelected)?'Đã khám phá trong trò chơi':'Có thể tra cứu; khám phá trong trò chơi để ghi nhận',cx,detailY+detailH-10*S,Math.max(9*S,UI.type.caption*S*.78),UI.color.dim);
  }
+ const footerY=py+ph-28*S;
+ button('‹',px+30*S,footerY,48*S,42*S,()=>{codexPage=(codexPage+pages-1)%pages;},UI.color.surfaceSoft);
+ uiText((codexPage+1)+' / '+pages+' · '+entries.length+' công thức',cx-8*S,footerY,UI.type.caption,UI.color.dim);
+ button('›',px+pw-30*S,footerY,48*S,42*S,()=>{codexPage=(codexPage+1)%pages;},UI.color.surfaceSoft);
+ button('Luyện phản ứng',cx,footerY-48*S,Math.min(190*S,pw*.42),40*S,()=>{
+  const entry=CODEX_ENTRIES[codexSelected];
+  if(!entry||entry.tab!==1){triggerToast('Chọn công thức Hóa học để luyện cân bằng.');return;}
+  const match=EQUATIONS.find(eq=>entry.title===eq.name||entry.title.includes(eq.name)||eq.name.includes(entry.title));
+  startMinigame(()=>{},match||null);
+ },UI.color.life);
+ button('Đóng',px+pw-76*S,footerY-48*S,105*S,40*S,()=>{codexOpen=false;},UI.color.heat);
+}
 
- button('Đóng',cx,H*.84,120*S,34*S, ()=>{ codexOpen = false; }, '#ffd36b');
+exOpen = false; }, '#ffd36b');
 }
 
 // ---------- Balancing Mini-Game Overlay ----------
