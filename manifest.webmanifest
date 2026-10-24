@@ -1,7 +1,7 @@
 {
   "name": "He Sinh Thai Hanh Tinh Xanh",
   "short_name": "Hanh Tinh Xanh",
-  "start_url": "./planet_garden.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
