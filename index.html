@@ -17,9 +17,43 @@ html,body{margin:0;width:100%;height:100%;min-height:100%;overflow:hidden;backgr
 canvas{display:block;width:100%;height:100%;height:100dvh;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
 @media (min-aspect-ratio:110/100){body{background:radial-gradient(ellipse at center,#244052 0%,#101e2b 48%,#060b11 100%)}}
 @media (pointer:fine) and (hover:hover){canvas{cursor:default}canvas:hover{outline:none}}
+
+/* Branded startup screen */
+#baoson-loader{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 50% 38%,#15382f 0%,#0b1b20 42%,#05090f 100%);color:#f2fff7;font-family:var(--game-font);opacity:1;visibility:visible;transition:opacity .48s ease,visibility .48s ease}
+#baoson-loader.is-hidden{opacity:0;visibility:hidden;pointer-events:none}
+#baoson-loader .loader-card{width:min(100%,390px);text-align:center;position:relative}
+#baoson-loader .planet-mark{width:82px;height:82px;margin:0 auto 25px;position:relative;border-radius:50%;background:radial-gradient(circle at 32% 28%,#b7ffd5 0%,#54d99a 22%,#187b5a 58%,#0c3c35 100%);box-shadow:0 0 42px #3dba7a44, inset -12px -12px 22px #041d1a88;animation:baoson-float 2.8s ease-in-out infinite}
+#baoson-loader .planet-mark:before{content:"";position:absolute;width:116px;height:27px;left:-17px;top:27px;border:2px solid #b4f5d2cc;border-radius:50%;transform:rotate(-23deg);box-shadow:0 0 12px #64e5a177}
+#baoson-loader .planet-mark:after{content:"";position:absolute;width:12px;height:12px;left:18px;top:25px;border-radius:50%;background:#e8fff2;box-shadow:27px 25px 0 -3px #b5f9d1,37px -11px 0 -4px #e8fff2}
+#baoson-loader .eyebrow{font-size:10px;letter-spacing:.24em;font-weight:800;color:#91dcb4;margin-bottom:10px}
+#baoson-loader .game-title{font-size:clamp(22px,6vw,30px);line-height:1.15;font-weight:900;letter-spacing:.035em;margin:0 auto 10px}
+#baoson-loader .game-subtitle{font-size:12px;letter-spacing:.13em;color:#9bbab0;margin-bottom:30px}
+#baoson-loader .load-track{height:4px;width:min(100%,245px);margin:0 auto 13px;overflow:hidden;border-radius:99px;background:#24423a}
+#baoson-loader .load-progress{height:100%;width:38%;border-radius:99px;background:linear-gradient(90deg,#42c986,#c1ffd9);box-shadow:0 0 14px #60e8a4;animation:baoson-progress 1.35s cubic-bezier(.4,0,.2,1) forwards}
+#baoson-loader .load-status{font-size:11px;color:#b8d1c7;letter-spacing:.035em;min-height:16px}
+#baoson-loader .made-by{margin-top:35px;font-size:11px;color:#77988b;letter-spacing:.08em}
+#baoson-loader .made-by strong{color:#b8f5d2;font-weight:800}
+@keyframes baoson-progress{0%{width:8%}70%{width:82%}100%{width:100%}}
+@keyframes baoson-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@media(prefers-reduced-motion:reduce){#baoson-loader .planet-mark,#baoson-loader .load-progress{animation:none}#baoson-loader .load-progress{width:100%}}
+
 </style>
 </head>
 <body>
+<div id="baoson-loader" role="status" aria-live="polite" aria-label="Đang tải trò chơi">
+ <div class="loader-card">
+  <div class="planet-mark" aria-hidden="true"></div>
+  <div class="eyebrow">MÔ PHỎNG KHOA HỌC</div>
+  <h1 class="game-title">HỆ SINH THÁI<br>HÀNH TINH XANH</h1>
+  <div class="game-subtitle">HỌC · THỬ NGHIỆM · KHÁM PHÁ</div>
+  <div class="load-track" aria-hidden="true"><div class="load-progress"></div></div>
+  <div class="load-status" id="baoson-load-status">Đang khởi tạo hành tinh…</div>
+  <div class="made-by">ĐƯỢC LÀM BỞI <strong>BAOSON</strong></div>
+ </div>
+</div>
+<script>
+(()=>{const loader=document.getElementById('baoson-loader'),status=document.getElementById('baoson-load-status');if(!loader)return;const started=performance.now();let ready=false;const hide=()=>{if(ready)return;ready=true;const wait=Math.max(0,1250-(performance.now()-started));setTimeout(()=>{if(status)status.textContent='Sẵn sàng khám phá';setTimeout(()=>{loader.classList.add('is-hidden');setTimeout(()=>loader.remove(),550);},180);},wait);};if(document.readyState==='complete')hide();else window.addEventListener('load',hide,{once:true});setTimeout(hide,4200);})();
+</script>
 <canvas id="c"></canvas>
 <script>
 (()=>{
