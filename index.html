@@ -12,8 +12,9 @@
 <!-- Palette: Deep Cosmic Teal, Solar Gold, Emerald Green & Terracotta -->
 <style>
 :root{--game-font:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Helvetica Neue",Arial,sans-serif}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#060b11;overscroll-behavior:none;user-select:none;-webkit-user-select:none;font-family:var(--game-font)}
-canvas{display:block;width:100vw;height:100vh;height:100dvh;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;min-height:100%;overflow:hidden;background:#060b11;overscroll-behavior:none;user-select:none;-webkit-user-select:none;font-family:var(--game-font);-webkit-text-size-adjust:100%}
+*,*::before,*::after{box-sizing:border-box}
+canvas{display:block;width:100%;height:100%;height:100dvh;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
 @media (min-aspect-ratio:110/100){body{background:radial-gradient(ellipse at center,#244052 0%,#101e2b 48%,#060b11 100%)}}
 @media (pointer:fine) and (hover:hover){canvas{cursor:default}canvas:hover{outline:none}}
 </style>
@@ -225,8 +226,9 @@ const lay={tw:40,th:20,ox:0,oy:0,cx:0,cy:0,hudH:134,top:134,bot:400};
 
 function resize(){
  canvasRect=null;
- const vw=Math.max(1,Math.round(window.innerWidth||document.documentElement.clientWidth));
- const vh=Math.max(1,Math.round(window.innerHeight||document.documentElement.clientHeight));
+ const vv=window.visualViewport;
+ const vw=Math.max(1,Math.round(vv?vv.width:(window.innerWidth||document.documentElement.clientWidth)));
+ const vh=Math.max(1,Math.round(vv?vv.height:(window.innerHeight||document.documentElement.clientHeight)));
  DPR=Math.min(window.devicePixelRatio||1,(vw>1440?1.5:2));
  VIEWW=vw;H=vh;
  W=(vw/vh>1.1)?Math.min(vw,1100):vw;
@@ -1703,18 +1705,26 @@ function drawOverlay(){
  ctx.globalAlpha=a;
  const cx=W/2,cy=H*.36;
  if(state==='menu'){
-  const bob=Math.sin(tAll*2)*6*S;
-  txt('Hệ Sinh Thái',cx,cy-40*S+bob,32*S,'#bfffd0','center','800');
-  txt('Hành Tinh Xanh',cx,cy-5*S+bob,32*S,'#bfffd0','center','800');
-  txt('Dùng thấu kính mặt trời và phản ứng hóa học.',cx,cy+28*S,13*S,'rgba(255,255,255,.85)','center','500');
+  const compact=H<700;
+  const bob=Math.sin(tAll*2)*Math.min(6*S,H*.008);
+  const titleSize=Math.min(32*S,W*.085,H*.065);
+  const titleY=compact?H*.105:H*.13;
+  txt('Hệ Sinh Thái',cx,titleY+bob,titleSize,'#bfffd0','center','800');
+  txt('Hành Tinh Xanh',cx,titleY+titleSize*1.08+bob,titleSize,'#bfffd0','center','800');
+  txt('Dùng thấu kính mặt trời và phản ứng hóa học.',cx,titleY+titleSize*1.8+8*S,Math.min(13*S,W*.035),'rgba(255,255,255,.85)','center','500');
 
-  const pulse=0.85 + 0.15*Math.sin(tAll*4);
-  button('Bắt đầu',cx,H*.64,200*S*pulse,50*S*pulse,()=>state='select');
-  button('Phòng thí nghiệm',cx,H*.73,200*S,42*S,()=>startLevel(0, true),'#7fe3a0');
-  button('Chơi vô tận',cx,H*.78,200*S,40*S,()=>startLevel(0,false,true),'#e6b35a');
-  button('Sổ công thức',cx,H*.82,200*S,40*S,()=>codexOpen=true,'#b08af0');
-  button('Thi đấu trực tuyến',cx,H*.89,200*S,38*S,()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;},onlineEnabled()?'#6fd68a':'#53636d');ctx.fillStyle=onlineEnabled()?'#42d987':'#6b7a82';circ(ctx,cx-88*S,H*.89,4*S);button('Bảng xếp hạng',cx,H*.96,170*S,34*S,()=>{if(onlineEnabled())openLeaderboard(0);else{state='online';onlineNote=ONLINE_OFFLINE_NOTE;}},onlineEnabled()?'#8ecbff':'#53636d');
-  button('BXH vô tận',cx,H*.925,150*S,30*S,()=>{if(onlineEnabled())openLeaderboard(12);else{state='online';onlineNote=ONLINE_OFFLINE_NOTE;}},onlineEnabled()?'#e6b35a':'#53636d');
+  const pulse=0.94 + 0.06*Math.sin(tAll*4);
+  const mainW=Math.min(220*S,W*.76), buttonH=Math.min(42*S,H*.065);
+  const ys=compact?[.48,.57,.66,.75,.84]:[.49,.59,.69,.79,.87];
+  button('Bắt đầu',cx,H*ys[0],mainW,buttonH,()=>state='select');
+  button('Phòng thí nghiệm',cx,H*ys[1],mainW,buttonH,()=>startLevel(0,true),'#7fe3a0');
+  button('Chơi vô tận',cx,H*ys[2],mainW,buttonH,()=>startLevel(0,false,true),'#e6b35a');
+  button('Sổ công thức',cx,H*ys[3],mainW,buttonH,()=>codexOpen=true,'#b08af0');
+  button('Thi đấu trực tuyến',cx,H*ys[4],mainW,buttonH,()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;},onlineEnabled()?'#6fd68a':'#53636d');
+  ctx.fillStyle=onlineEnabled()?'#42d987':'#6b7a82';circ(ctx,cx-mainW*.42,H*ys[4],4*S);
+  const bottomY=H*.95,halfGap=Math.min(8*S,W*.025),smallW=Math.min((W-24*S-halfGap)/2,mainW*.52),smallH=Math.min(34*S,H*.055);
+  button('Bảng xếp hạng',cx-smallW/2-halfGap/2,bottomY,smallW,smallH,()=>{if(onlineEnabled())openLeaderboard(0);else{state='online';onlineNote=ONLINE_OFFLINE_NOTE;}},onlineEnabled()?'#8ecbff':'#53636d');
+  button('BXH vô tận',cx+smallW/2+halfGap/2,bottomY,smallW,smallH,()=>{if(onlineEnabled())openLeaderboard(12);else{state='online';onlineNote=ONLINE_OFFLINE_NOTE;}},onlineEnabled()?'#e6b35a':'#53636d');
  }else if(state==='select'){
   drawLevelSelect();
   button('Bảng xếp hạng',cx-75*S,H*.94,145*S,38*S,()=>openLeaderboard(0),'#7fe3a0');
