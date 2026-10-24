@@ -245,7 +245,48 @@ prepareText();
 
 // ---------- Audio Engine ----------
 let AC=null,master=null,ambientGain=null,noiseBuf=null,activeSoundCount=0;
+let bgmTimer=null,bgmStep=0,bgmGain=null;
 const lastS={};
+
+// Nhạc nền tự tổng hợp bằng Web Audio, không cần tải tệp ngoài.
+// Giai điệu ambient êm, âm lượng thấp; dùng chung nút loa/tắt tiếng của game.
+const BGM_NOTES=[659.25,587.33,523.25,392.00,440.00,523.25,587.33,440.00,
+  349.23,392.00,440.00,523.25,493.88,440.00,392.00,329.63,
+  392.00,440.00,523.25,659.25,587.33,523.25,440.00,392.00,
+  349.23,392.00,440.00,392.00,329.63,392.00,440.00,523.25];
+function playBgmNote(freq,duration,when,volume){
+ if(!AC||!master||muted||AC.state!=='running')return;
+ try{
+  const osc=AC.createOscillator(),gain=AC.createGain(),filter=AC.createBiquadFilter();
+  osc.type='sine';osc.frequency.setValueAtTime(freq,when);
+  filter.type='lowpass';filter.frequency.value=1800;
+  gain.gain.setValueAtTime(.0001,when);
+  gain.gain.linearRampToValueAtTime(volume,when+.045);
+  gain.gain.setValueAtTime(volume,when+duration*.55);
+  gain.gain.exponentialRampToValueAtTime(.0001,when+duration);
+  osc.connect(filter);filter.connect(gain);gain.connect(bgmGain||master);
+  osc.start(when);osc.stop(when+duration+.02);
+ }catch(e){}
+}
+function startBgm(){
+ if(!AC||!master||bgmTimer!==null)return;
+ try{
+  bgmGain=AC.createGain();bgmGain.gain.value=.24;bgmGain.connect(master);
+  const tick=()=>{
+   if(!AC||!bgmGain)return;
+   if(AC.state==='running'&&!muted){
+    const now=AC.currentTime;
+    const n=BGM_NOTES[bgmStep%BGM_NOTES.length];
+    playBgmNote(n,.29,now+.02,.055);
+    if(bgmStep%4===0)playBgmNote(n/2,.72,now+.02,.025);
+    if(bgmStep%8===0)playBgmNote([130.81,110,146.83,98][Math.floor(bgmStep/8)%4],1.1,now+.02,.035);
+   }
+   bgmStep=(bgmStep+1)%BGM_NOTES.length;
+   bgmTimer=setTimeout(tick,320);
+  };
+  bgmTimer=setTimeout(tick,100);
+ }catch(e){bgmTimer=null;}
+}
 function initAudio(){
  if(AC){if(AC.state==='suspended')try{AC.resume();}catch(e){}return;}
  try{
@@ -258,6 +299,7 @@ function initAudio(){
   const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
 
   startAmbient();
+  startBgm();
  }catch(e){AC=null;}
 }
 
