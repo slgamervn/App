@@ -105,13 +105,13 @@ let settings=(()=>{let x=loadStore('p_settings',{});if(!x||typeof x!=='object'||
 function saveSettings(){saveStore('p_settings',settings);muted=settings.muteEffects;saveStore('p_muted',muted);}
 let tutorialActive=false,tutorialIndex=0;
 const TUTORIAL_STEPS=[
- {title:'1. Điều khiển ánh sáng',body:'Kéo thanh Góc chiếu để di chuyển vùng nắng trên bản đồ. Kéo Tiêu cự để thay đổi độ tập trung của ánh sáng.'},
- {title:'2. Chạm vào ô đất',body:'Chạm vào ô trên hành tinh để dùng công cụ đang chọn. Hạt giúp cây phát triển; Nước tăng độ ẩm; Ăn cỏ và Ăn thịt tạo các mắt xích trong chuỗi thức ăn.'},
- {title:'3. Đọc các chỉ số',body:'Xem mục tiêu Cây, Ăn cỏ, Ăn thịt ở đầu màn hình. Mở Môi trường để xem nhiệt độ, nước, hơi nước và các chỉ số hóa học khi có.'},
- {title:'4. Giữ hành tinh cân bằng',body:'Nắng quá tập trung làm đất nóng và khô; thiếu năng lượng có thể khiến hành tinh lạnh. Hơi nước tích tụ có thể tạo mây và mưa. Điều chỉnh nhẹ, rồi quan sát phản ứng.'},
- {title:'5. Hoàn thành màn chơi',body:'Đạt đủ số lượng sinh vật yêu cầu trước khi hết giờ và tránh để hệ sinh thái sụp đổ. Màn hóa học còn yêu cầu kiểm soát pH, O₂ và phản ứng an toàn.'},
- {title:'6. Phòng thí nghiệm',body:'Chế độ tự do cho phép thử công cụ và thảm họa. Chọn công cụ ở hàng dưới; dùng mũi tên để chuyển trang khi có nhiều công cụ. Một số thảm họa có thời gian hồi chiêu.'},
- {title:'7. Tạm dừng và trợ giúp',body:'Chạm nút Ⅱ ở góc trên để tạm dừng, tiếp tục hoặc chơi lại. Nút Lớp xem · O đổi lớp hiển thị; trên máy tính có thể nhấn phím O. Mở Cài đặt → Xem lại hướng dẫn để xem lại bất cứ lúc nào.'}
+ {title:'1. Mục tiêu của trò chơi',body:'Mỗi màn có mục tiêu riêng. Hãy đọc yêu cầu ở đầu màn hình, thường là nuôi đủ cây, động vật ăn cỏ hoặc động vật ăn thịt trước khi hết giờ. Đừng làm hệ sinh thái mất cân bằng. Bấm Tiếp tục để học từng thao tác.'},
+ {title:'2. Chọn công cụ trước',body:'Nhìn hàng công cụ ở cạnh dưới màn hình. Chạm một công cụ để chọn; công cụ đang chọn sẽ được làm nổi bật. Nếu có nhiều công cụ, bấm mũi tên để xem trang tiếp theo. Sau đó mới chạm vào bản đồ.'},
+ {title:'3. Tác động lên bản đồ',body:'Chạm vào ô đất để dùng công cụ đang chọn tại vị trí đó. Hạt dùng để giúp cây mọc; Nước làm đất ẩm hơn. Hãy thử từng chút một rồi quan sát thay đổi, đừng đặt quá nhiều cùng lúc.'},
+ {title:'4. Điều chỉnh ánh sáng',body:'Nếu thấy thanh Góc chiếu hoặc Tiêu cự, kéo thanh để thay đổi vùng và độ tập trung của ánh sáng. Nắng tập trung quá mạnh có thể làm đất nóng, khô; ánh sáng quá yếu có thể khiến hệ sinh thái thiếu năng lượng.'},
+ {title:'5. Đọc thông tin và phản hồi',body:'Theo dõi mục tiêu ở đầu màn hình để biết còn thiếu gì. Mở Môi trường để xem nhiệt độ, nước, hơi nước và các chỉ số khác nếu màn có hỗ trợ. Sau mỗi thao tác, đợi một chút để thấy hệ sinh thái phản ứng.'},
+ {title:'6. Cách thắng và tránh thua',body:'Hoàn thành đủ mục tiêu trước khi đồng hồ về 0. Giữ nhiệt độ, nước và số lượng sinh vật ở mức hợp lý; nếu một loài tăng quá nhiều hoặc biến mất, chuỗi thức ăn có thể bị ảnh hưởng. Màn hóa học có thể thêm yêu cầu về pH và O₂.'},
+ {title:'7. Tạm dừng và xem lại',body:'Chạm nút Ⅱ ở góc trên để tạm dừng, tiếp tục hoặc chơi lại. Nút Lớp xem hoặc phím O trên máy tính đổi lớp hiển thị. Muốn xem lại hướng dẫn, vào Cài đặt → Xem lại hướng dẫn.'}
 ];
 let chemDebugLast=null;
 let toastMsg = '', toastTimer = 0;
@@ -1472,7 +1472,7 @@ function applyAudioSettings(){muted=settings.muteEffects;if(master&&AC)master.ga
 function drawTutorial(){
  if(!tutorialActive)return;
  const step=TUTORIAL_STEPS[clamp(tutorialIndex,0,TUTORIAL_STEPS.length-1)];
- const phone=W<700,boxW=Math.min(W-28*S,560*S),boxH=Math.min(H-32*S,phone?Math.max(290*S,H*.52):300*S),boxX=(W-boxW)/2,boxY=(H-boxH)/2;
+ const phone=W<700,boxW=Math.min(W-24*S,560*S),boxH=Math.min(H-24*S,phone?Math.max(360*S,H*.72):340*S),boxX=(W-boxW)/2,boxY=(H-boxH)/2;
  ctx.fillStyle='rgba(3,8,14,.82)';ctx.fillRect(0,0,W,H);
  rr(ctx,boxX,boxY,boxW,boxH,18*S);ctx.fillStyle='#14283a';ctx.fill();ctx.strokeStyle='#7fe3a0';ctx.lineWidth=1.5*S;ctx.stroke();
  txt('HƯỚNG DẪN CHƠI',W/2,boxY+30*S,Math.max(15*S,UI.type.title*S*.85),'#bfffd0','center','800');
@@ -1481,8 +1481,9 @@ function drawTutorial(){
  ctx.save();ctx.font='600 '+fontSize+'px '+UI.font;ctx.fillStyle='#e5f0f0';ctx.textAlign='left';ctx.textBaseline='middle';
  const words=step.body.split(/\s+/),maxWidth=boxW-34*S,lineH=fontSize*1.55,lines=[];let line='';
  for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);
- const maxLines=Math.max(2,Math.floor((boxH-130*S)/lineH)),shown=lines.slice(0,maxLines);if(lines.length>maxLines&&shown.length)shown[shown.length-1]=shown[shown.length-1].replace(/[.,;:]?$/,'…');
- const textY=boxY+95*S+(boxH-140*S-shown.length*lineH)/2;shown.forEach((line,i)=>ctx.fillText(line,boxX+17*S,textY+i*lineH));ctx.restore();
+ const maxLines=Math.max(3,Math.floor((boxH-154*S)/lineH)),shown=lines.slice(0,maxLines);
+ const textY=boxY+100*S;shown.forEach((line,i)=>ctx.fillText(line,boxX+17*S,textY+i*lineH));ctx.restore();
+ if(lines.length>maxLines){txt('Nội dung còn tiếp — tăng cỡ màn hình để đọc rõ hơn',W/2,boxY+boxH-78*S,UI.type.caption,'#f3c978','center','600');}
  txt((tutorialIndex+1)+' / '+TUTORIAL_STEPS.length,W/2,boxY+boxH-58*S,UI.type.caption,'#b8c9cb','center','700');
  button(tutorialIndex===TUTORIAL_STEPS.length-1?'Bắt đầu chơi':'Tiếp tục',W*.59,boxY+boxH-28*S,Math.min(140*S,boxW*.34),38*S,()=>{tutorialIndex++;if(tutorialIndex>=TUTORIAL_STEPS.length){tutorialActive=false;settings.tutorialSeen=true;saveSettings();}},'#7fe3a0');
  button('Bỏ qua',W*.36,boxY+boxH-28*S,Math.min(100*S,boxW*.28),38*S,()=>{tutorialActive=false;settings.tutorialSeen=true;saveSettings();},'#ff8a8a');
