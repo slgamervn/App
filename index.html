@@ -1384,10 +1384,13 @@ function drawHUD(){
   if(LEVELS[lvl]) LEVELS[lvl].hint.forEach((h,i)=>txt(h,W/2,(124+i*14)*S,11*S,'rgba(255,255,255,'+a+')','center','500'));
  }
 
- // Codex Button top right
- button('Sổ công thức', W - (fsSupported?150:110)*S, isSandbox ? 60*S : 80*S, 100*S, 26*S, ()=>{
-  codexOpen = true;
- }, '#b08af0');
+ // Nút Sổ công thức nằm ở mép trên bên phải, tách khỏi các đồng hồ CO2/H2/pH.
+ const codexBtnW=100*S,codexBtnH=28*S;
+ const codexBtnX=W-codexBtnW/2-12*S;
+ const codexBtnY=isSandbox?42*S:42*S;
+ button('Sổ công thức',codexBtnX,codexBtnY,codexBtnW,codexBtnH,()=>{
+  codexOpen=true;
+ },'#b08af0');
 
  if(toastTimer > 0){
   toastTimer -= 0.016;
