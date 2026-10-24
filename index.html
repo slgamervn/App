@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#060b11">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Hệ Sinh Thái Hành Tinh Xanh - Stage 5 Chemistry & Codex</title>
 <!-- Palette: Deep Cosmic Teal, Solar Gold, Emerald Green & Terracotta -->
 <style>
@@ -1970,6 +1975,14 @@ state='menu';stateT=0;
 if(dbConfigured())probeOnline().then(()=>{});else{onlineReachable=false;onlineNote=ONLINE_OFFLINE_NOTE;}
 requestAnimationFrame(frame);
 })();
+</script>
+<script>
+if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost")){
+ try{window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").then(reg=>{
+  if(reg.waiting){const t=document.createElement("div");t.textContent="Có bản cập nhật - tải lại";t.style.cssText="position:fixed;z-index:2147483647;bottom:12px;left:50%;transform:translateX(-50%);background:#17372f;color:#eafff2;padding:10px 14px;border-radius:12px;font:14px system-ui";document.body.appendChild(t);t.onclick=()=>location.reload();}
+  reg.addEventListener("updatefound",()=>{const w=reg.installing;if(w)w.addEventListener("statechange",()=>{if(w.state==="installed"&&navigator.serviceWorker.controller){const t=document.createElement("div");t.textContent="Có bản cập nhật - tải lại";t.style.cssText="position:fixed;z-index:2147483647;bottom:12px;left:50%;transform:translateX(-50%);background:#17372f;color:#eafff2;padding:10px 14px;border-radius:12px;font:14px system-ui";document.body.appendChild(t);t.onclick=()=>location.reload();}});});
+ }).catch(()=>{}));}catch(_){}
+}
 </script>
 </body>
 </html>
