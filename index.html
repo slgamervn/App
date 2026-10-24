@@ -2012,7 +2012,7 @@ function frame(ts){
 let resizeTimer=0;
 const scheduleResize=()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(resize,100);};
 window.addEventListener('resize',scheduleResize);window.addEventListener('orientationchange',scheduleResize);window.addEventListener('scroll',()=>{canvasRect=cv.getBoundingClientRect();},{passive:true});
-if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>{positionTextInput();});window.visualViewport.addEventListener('scroll',()=>{positionTextInput();},{passive:true});}
+if(window.visualViewport){window.visualViewport.addEventListener('resize',scheduleResize);window.visualViewport.addEventListener('scroll',()=>{canvasRect=cv.getBoundingClientRect();positionTextInput();},{passive:true});}
 resize();
 state='menu';stateT=0;
 if(dbConfigured())probeOnline().then(()=>{});else{onlineReachable=false;onlineNote=ONLINE_OFFLINE_NOTE;}
