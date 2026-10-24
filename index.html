@@ -41,7 +41,7 @@ const LEVELS=[
  {name:'Khởi động',w:50,g:{p:10,h:2,c:0},drift:false,chem:false,hint:['Kéo "Góc chiếu" để rải nắng, đừng đứng yên!','Đứng một chỗ quá lâu là đất khô cháy đó.']},
  {name:'Chuỗi thức ăn',w:40,g:{p:12,h:3,c:1},drift:false,chem:false,hint:['Cây nuôi ăn cỏ, ăn cỏ nuôi ăn thịt.','Tiêu cự cao + ít nắng toàn cục = mưa.']},
  {name:'Mặt trời trôi',w:30,g:{p:14,h:4,c:2},drift:true,chem:false,hint:['Mặt trời đang trôi, hãy chỉnh liên tục!','Hơi nước quá nhiều sẽ làm cả hành tinh nóng lên.']},
- {name:'Bão mặt trời',w:60,g:{p:8,h:2,c:0},drift:false,chem:false,flare:true,hint:['Màn này đã giảm độ khó: ưu tiên giữ 8 cây sống và 2 con ăn cỏ; không cần duy trì thú ăn thịt. Khi có cảnh báo, giảm tiêu cự để tản nhiệt.']},
+ {name:'Bão mặt trời',w:60,g:{p:8,h:2,c:0},drift:false,chem:false,flare:true,hint:['Đã giảm sức nóng của bão mặt trời. Giữ ít nhất 8 cây và 2 con ăn cỏ; khi có cảnh báo, phân tán sinh vật khỏi vùng lóe sáng.']},
  {name:'Đêm băng giá',w:50,g:{p:12,h:3,c:1},drift:false,chem:false,dn:true,hint:['Đêm xuống nhiệt độ giảm sâu. Gom nắng vào một chỗ để chống đóng băng!']},
  {name:'Đại tuần hoàn',w:30,g:{p:14,h:4,c:2},drift:true,chem:false,flare:true,dn:true,hint:['Thử thách tổng hợp: Mặt trời trôi, bão flare và chu kỳ ngày đêm!']},
  {name:'Năng lượng mới',w:40,g:{p:10,h:2,c:0},drift:false,chem:false,hint:['Màn đệm kỹ năng sinh thái.','Giữ đất ẩm và cây xanh đều đặn.']},
@@ -433,7 +433,7 @@ function lightAt(h,x,y){
  const dx=x-h.x,dy=y-h.y,s=.75*h.r;
  let l = .15+h.peak*Math.exp(-(dx*dx+dy*dy)/(2*s*s));
  if(!isSandbox && LEVELS[lvl] && LEVELS[lvl].dn){l *= dayNightFactor;}
- if(flareActive && Math.abs(x-flarePos.x)<=1 && Math.abs(y-flarePos.y)<=1){l += 1.8;}
+ if(flareActive && Math.abs(x-flarePos.x)<=1 && Math.abs(y-flarePos.y)<=1){l += 0.65;}
  return clamp(l,0,10);
 }
 
@@ -564,7 +564,7 @@ function tick(){
    flareWarn=false;
    flareActive=true;
   }
-  if(flareActive && flareTimer>=11){
+  if(flareActive && flareTimer>=9.5){
    flareActive=false;
    flareTimer=0;
   }
