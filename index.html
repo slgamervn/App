@@ -98,7 +98,7 @@ const worldObjects=[];
 const controlLayout={sliders:[],buttons:[],mute:null};
 const btns=controlLayout.buttons;
 let ticks=0,acc=0,vapor=0,o2=0,co2=50,h2=0,rainT=0,photoT=0,photoCool=0,flash=0,shakeT=0,cT=0,tAll=0,hintT=0;
-let collapsed=false,cOrig={x:3.5,y:3.5},muted=loadStore('p_muted',false);
+let collapsed=false,cOrig={x:3.5,y:3.5},muted=loadStore('p_muted',false),vibrationEnabled=loadStore('p_vibration',true),settingsReturnState='menu';
 let hs={x:3.5,y:3,r:2.5,peak:.8};
 
 // Chemistry & Tools state
@@ -220,7 +220,7 @@ for(let i=0; i<REPLAY_MAX; i++){
 let ringHead = 0, ringSize = 0, isReplaying = false, replayIdx = 0, replayTimer = 0;
 let regretCardsUnlocked = loadStore('p_regret', []);
 
-function vibrate(ms){if(!muted&&navigator.vibrate)try{navigator.vibrate(ms);}catch(e){}}
+function vibrate(ms){if(vibrationEnabled&&navigator.vibrate)try{navigator.vibrate(ms);}catch(e){}}
 
 const lay={tw:40,th:20,ox:0,oy:0,cx:0,cy:0,hudH:134,top:134,bot:400};
 
@@ -425,7 +425,7 @@ function positionTextInput(){if(!inputOverlay||inputOverlay.style.display==='non
 function hideTextInput(){if(inputOverlay){inputOverlay.style.display='none';try{inputOverlay.blur();}catch(_){}}inputPurpose='';}
 async function confirmTextInput(){const v=inputOverlay?inputOverlay.value:inputValue,purpose=inputPurpose;hideTextInput();if(purpose==='name'){await setPlayerName(v);state='online';}else if(purpose==='roomcode'){await joinRoom(v.toUpperCase());}stateT=0;}
 function formatSurvivalTime(seconds){seconds=Math.max(0,Math.floor(Number(seconds)||0));const m=Math.floor(seconds/60),sec=seconds%60;return m+'m '+String(sec).padStart(2,'0')+'s';}
-async function submitEndlessTime(){if(!onlineEnabled()||!dbBase())return false;const seconds=Math.max(0,Math.floor(ticks*TICK));if(seconds<=0)return false;const key='endless',data=await dbGet('lb/'+key,'orderBy="s"&limitToLast=10');const rows=Object.values(data||{});const personalBest=Math.max(0,...rows.filter(v=>safeText(v&&v.n,12)===playerName).map(v=>Number(v.s)||0));if(seconds<=personalBest)return false;const saved=await dbPush('lb/'+key,{n:playerName,s:seconds,t:nowSrv()});if(saved&&saved.name){lbCacheAt[key]=0;return true;}return false;}
+async function submitEndlessTime(){if(!onlineEnabled()||!dbBase())return false;const seconds=Math.max(0,Math.floor(ticks*TICK));if(seconds<=0)return false;const key='endless',data=await dbGet('lb/'+key,'orderBy="s"&limitToLast=10');const rows=Object.values(data||{});const personalBest=Math.max(0,...rows.filter(v=>safeText(v&&v.n,12)===playerName).map(v=>Number(v.s)||0));if(seconds<=personalBest)return false;const saved=await dbPush('lb/'+key,{n:playerName,s:seconds,t:Date.now()});if(saved&&saved.name){lbCacheAt[key]=0;return true;}return false;}
 async function submitLeaderboard(){if(!dbBase()||!onlineScorePayload)return false;if(!onlineReachable&&!await probeOnline()){onlineScoreRetry=true;return false;}if(onlineScoreSent&&!onlineScoreRetry)return true;onlineScoreSent=false;onlineScoreRetry=false;const v=await dbPush('lb/'+lvl,onlineScorePayload);if(v&&typeof v.name==='string'){onlineScoreKey=v.name;onlineScoreSent=true;return true;}onlineScoreRetry=true;return false;}
 async function openLeaderboard(level=lbLevel){if(state!=='leaderboard')lbReturnState=state==='select'?'select':state==='menu'?'menu':'online';lbLevel=clamp(level|0,0,12);state='leaderboard';stateT=0;lbError='';if(dbBase()&&!onlineReachable)await probeOnline();const key=lbLevel===12?'endless':String(lbLevel),age=Date.now()-(lbCacheAt[key]||0);if(lbCache[key]&&age<30000){lbRows=lbCache[key];lbLoading=false;return;}lbLoading=true;const data=await dbGet('lb/'+key,'orderBy="s"&limitToLast=10');if(data===null){lbRows=[];lbError='Không tải được bảng xếp hạng.';}else{lbRows=Object.entries(data).map(([id,v])=>({id,n:safeText(v&&v.n,12)||'Khach',s:clamp(Number(v&&v.s)||0,0,999999),t:Number(v&&v.t)||0})).sort((a,b)=>b.s-a.s||a.t-b.t).slice(0,10);lbCache[key]=lbRows;lbCacheAt[key]=Date.now();}lbLoading=false;}
 async function refreshLeaderboard(){lbCacheAt[lbLevel===12?'endless':lbLevel]=0;await openLeaderboard(lbLevel);}
@@ -1462,6 +1462,8 @@ function drawHUD(){
  }
 
  // Nút Sổ công thức nằm ở mép trên bên phải, tách khỏi các đồng hồ CO2/H2/pH.
+ button('Ⅱ',W-116*S,72*S,42*S,34*S,()=>togglePause(),'#e6b35a');
+ button('⚙',W-66*S,72*S,42*S,34*S,()=>openSettings('play'),'#8ecbff');
  const codexBtnW=100*S,codexBtnH=28*S;
  const codexBtnX=W-codexBtnW/2-12*S;
  const codexBtnY=isSandbox?42*S:42*S;
@@ -1727,11 +1729,24 @@ function drawOverlay(){
   button('Phòng thí nghiệm',cx,H*ys[1],mainW,buttonH,()=>startLevel(0,true),'#7fe3a0');
   button('Chơi vô tận',cx,H*ys[2],mainW,buttonH,()=>startLevel(0,false,true),'#e6b35a');
   button('Sổ công thức',cx,H*ys[3],mainW,buttonH,()=>codexOpen=true,'#b08af0');
+  button('Cài đặt',cx,H*.925,Math.min(145*S,W*.44),Math.min(30*S,H*.048),()=>openSettings('menu'),'#8ecbff');
   button('Thi đấu trực tuyến',cx,H*ys[4],mainW,buttonH,()=>{state='online';stateT=0;onlineNote=onlineEnabled()?'':ONLINE_OFFLINE_NOTE;},onlineEnabled()?'#6fd68a':'#53636d');
   ctx.fillStyle=onlineEnabled()?'#42d987':'#6b7a82';circ(ctx,cx-mainW*.42,H*ys[4],4*S);
   const bottomY=H*.95,halfGap=Math.min(8*S,W*.025),smallW=Math.min((W-24*S-halfGap)/2,mainW*.52),smallH=Math.min(34*S,H*.055);
-  button('Bảng xếp hạng',cx-smallW/2-halfGap/2,bottomY,smallW,smallH,()=>{if(onlineEnabled())openLeaderboard(0);else{state='online';onlineNote=ONLINE_OFFLINE_NOTE;}},onlineEnabled()?'#8ecbff':'#53636d');
-  button('BXH vô tận',cx+smallW/2+halfGap/2,bottomY,smallW,smallH,()=>{if(onlineEnabled())openLeaderboard(12);else{state='online';onlineNote=ONLINE_OFFLINE_NOTE;}},onlineEnabled()?'#e6b35a':'#53636d');
+  button('Bảng xếp hạng',cx-smallW/2-halfGap/2,bottomY,smallW,smallH,()=>openLeaderboard(0),'#8ecbff');
+  button('BXH vô tận',cx+smallW/2+halfGap/2,bottomY,smallW,smallH,()=>openLeaderboard(12),'#e6b35a');
+ }else if(state==='settings'){
+  txt('CÀI ĐẶT',cx,cy-68*S,25*S,'#bfffd0','center','800');
+  button('Âm thanh: '+(muted?'Tắt':'Bật'),cx,H*.43,220*S,42*S,()=>{muted=!muted;saveStore('p_muted',muted);if(master&&AC)try{master.gain.setTargetAtTime(muted?0:.5,AC.currentTime,.02);}catch(_){}},muted?'#53636d':'#6fd68a');
+  button('Rung: '+(vibrationEnabled?'Bật':'Tắt'),cx,H*.52,220*S,42*S,()=>{vibrationEnabled=!vibrationEnabled;saveStore('p_vibration',vibrationEnabled);},vibrationEnabled?'#6fd68a':'#53636d');
+  button('Toàn màn hình',cx,H*.61,220*S,42*S,()=>toggleFullscreen(),'#8ecbff');
+  button('Quay lại',cx,H*.75,150*S,42*S,()=>closeSettings(),'#ffd36b');
+ }else if(state==='paused'){
+  txt('ĐÃ TẠM DỪNG',cx,cy-70*S,25*S,'#ffe28a','center','800');
+  button('Tiếp tục',cx,H*.43,220*S,44*S,()=>{state='play';stateT=0;},'#6fd68a');
+  button('Chơi lại',cx,H*.53,220*S,42*S,()=>startLevel(lvl,isSandbox,isEndless),'#8ecbff');
+  button('Cài đặt',cx,H*.63,220*S,42*S,()=>openSettings('paused'),'#b08af0');
+  button('Về menu chính',cx,H*.73,220*S,42*S,()=>{state='menu';stateT=0;codexOpen=false;},'#ffd36b');
  }else if(state==='select'){
   drawLevelSelect();
   button('Bảng xếp hạng',cx-75*S,H*.94,145*S,38*S,()=>openLeaderboard(0),'#7fe3a0');
@@ -1795,11 +1810,12 @@ function drawOverlay(){
    button('Xem lại chậm',cx-70*S,H*.60,130*S,46*S,()=>{
     isReplaying=true; replayIdx=0; replayTimer=0;
    },'#ffb25a');
-   button('Thử lại',cx+70*S,H*.60,120*S,46*S,()=>startLevel(lvl),'#ffd36b');
+   button('Thử lại',cx+70*S,H*.60,120*S,46*S,()=>startLevel(lvl,isSandbox,isEndless),'#ffd36b');
   } else {
-   button('Thử lại',cx-65*S,H*.60,120*S,46*S,()=>startLevel(lvl),'#ffd36b');
+   button('Thử lại',cx-65*S,H*.60,120*S,46*S,()=>startLevel(lvl,isSandbox,isEndless),'#ffd36b');
   }
 
+  button('Về menu chính',cx+70*S,H*.78,140*S,40*S,()=>{state='menu';stateT=0;codexOpen=false;},'#ffd36b');
   button('Lưu ảnh sụp đổ',cx-65*S,H*.70,130*S,42*S,exportCanvasImage,'#7fe3a0');
   button('Chọn màn',cx+65*S,H*.70,130*S,42*S,()=>state='select','#8ef0a0');
  }
@@ -1867,7 +1883,9 @@ for(const ev of ['touchmove','gesturestart','gesturechange','gestureend'])docume
 // Desktop keyboard controls and lifecycle guards.
 const heldKeys=new Map();let pauseReturnState='play',pauseReason='';
 const finePointer=()=>window.matchMedia&&window.matchMedia('(pointer: fine) and (hover: hover)').matches;
-function togglePause(){if(state==='paused'){state=pauseReturnState;stateT=0;}else if(state==='play'){pauseReturnState=state;state='paused';pauseReason='Tạm dừng';}}
+function togglePause(){if(state==='paused'){state=pauseReturnState;stateT=0;}else if(state==='play'){pauseReturnState=state;state='paused';stateT=0;pauseReason='Tạm dừng';}}
+function openSettings(fromState=state){settingsReturnState=fromState;state='settings';stateT=0;}
+function closeSettings(){state=settingsReturnState;stateT=0;}
 function fullscreenElement(){return document.fullscreenElement||document.webkitFullscreenElement;}
 function toggleFullscreen(){try{if(fullscreenElement()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);}else{const f=cv.requestFullscreen||cv.webkitRequestFullscreen;if(f)f.call(cv);}}catch(e){}}
 const fsSupported=!!(cv.requestFullscreen||cv.webkitRequestFullscreen)&&!(/iPhone|iPad|iPod/.test(navigator.userAgent)&&!window.MSStream);
