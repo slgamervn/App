@@ -58,7 +58,7 @@ canvas{display:block;width:100%;height:100%;height:100dvh;touch-action:manipulat
 <script>
 (()=>{
 'use strict';
-const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const cv=document.getElementById('c');let ctx=cv.getContext('2d');
 const FONT_STACK='system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Helvetica Neue",Arial,sans-serif';
 const SUPABASE_URL="https://nqtdriavarupnoqwdkfc.supabase.co"; // Project URL Supabase.
 const SUPABASE_ANON_KEY="sb_publishable_RAJFcVEqpNsLs27jmEKmyQ_sFqtBdr-"; // Publishable key công khai; không dùng service_role.
@@ -250,7 +250,7 @@ const TUTORIAL_STEPS=[
 {title:'4. Điều chỉnh ánh sáng',body:'Kéo thanh Góc chiếu để di chuyển vùng nắng; kéo Tiêu cự để thay đổi độ tập trung. Nắng quá mạnh có thể làm đất nóng và khô.'},
 {title:'5. Theo dõi chỉ số',body:'Xem mục tiêu và số lượng sinh vật ở đầu màn hình. Mở Môi trường để theo dõi nhiệt độ, nước và các chỉ số khác nếu màn có hỗ trợ.'},
 {title:'6. Hoàn thành màn',body:'Đạt đủ mục tiêu trước khi hết giờ và tránh để hệ sinh thái sụp đổ. Cây và động vật có liên hệ trong chuỗi thức ăn, nên hãy giữ cân bằng.'},
-{title:'7. Tạm dừng và trợ giúp',body:'Chạm nút Ⅱ để tạm dừng hoặc tiếp tục. Nút Lớp xem hoặc phím O trên máy tính đổi lớp hiển thị. Bạn có thể xem lại hướng dẫn trong Cài đặt.'}
+{title:'7. Tạm dừng và trợ giúp',body:'Chạm nút Ⅱ để tạm dừng hoặc tiếp tục. Trong Cài đặt, bạn có thể chỉnh tùy chọn trò chơi; mở Sổ công thức để xem kiến thức và công thức đã mở khóa. Bạn có thể xem lại hướng dẫn trong Cài đặt.'}
 ];
 function closeTutorial(){
  tutorialActive=false;
@@ -1065,13 +1065,16 @@ function exportCanvasImage(){
  objs.sort((p,q)=>p.d-q.d);
 
  const oldCtx = ctx;
- ctx = tCtx;
- for(const o of objs){
-  if(o.k===0){const p=proj(o.x,o.y);drawPlant(p[0],p[1],o.P,o.wv,o.sc,o.x,o.y);}
-  else{const p=proj(o.a.fx,o.a.fy);if(o.k===1)drawHerb(p[0],p[1],o.a,o.sc);else drawCarn(p[0],p[1],o.a,o.sc);}
+ try{
+  ctx = tCtx;
+  for(const o of objs){
+   if(o.k===0){const p=proj(o.x,o.y);drawPlant(p[0],p[1],o.P,o.wv,o.sc,o.x,o.y);}
+   else{const p=proj(o.a.fx,o.a.fy);if(o.k===1)drawHerb(p[0],p[1],o.a,o.sc);else drawCarn(p[0],p[1],o.a,o.sc);}
+  }
+ }finally{
+  ctx = oldCtx;
+  tCtx.restore();
  }
- ctx = oldCtx;
- tCtx.restore();
 
  tCtx.font='700 '+(16*S*DPR)+'px '+FONT_STACK;
  tCtx.fillStyle='rgba(255,255,255,0.75)';
@@ -1494,7 +1497,25 @@ function drawReplayWorld(){
  const targetIdx = (ringHead - ringSize + replayIdx + REPLAY_MAX) % REPLAY_MAX;
  const snap = ringSnapshots[targetIdx];
 
- renderTerrainToBuffer();
+ // Build terrain from the selected replay snapshot, never from the live world.
+ const liveTerrain = new Array(N*N);
+ const oldTerrainDirty = terrainDirty;
+ try{
+  for(let i=0;i<N*N;i++){
+   const t=tiles[i];
+   liveTerrain[i]={T:t.T,W:t.W,P:t.P,pH:t.pH,des:t.des,frozen:t.frozen};
+   t.T=snap.tilesT[i];t.W=snap.tilesW[i];t.P=snap.tilesP[i];
+   t.pH=snap.tilespH[i];t.des=snap.tilesDes[i];t.frozen=snap.tilesFrozen[i];
+  }
+  terrainDirty=true;
+  renderTerrainToBuffer();
+ }finally{
+  for(let i=0;i<N*N;i++){
+   const t=tiles[i],v=liveTerrain[i];
+   t.T=v.T;t.W=v.W;t.P=v.P;t.pH=v.pH;t.des=v.des;t.frozen=v.frozen;
+  }
+  terrainDirty=oldTerrainDirty;
+ }
  ctx.drawImage(bgCanvas, 0, 0, cv.width/DPR, cv.height/DPR);
 
  const objs=[];
