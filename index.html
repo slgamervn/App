@@ -141,15 +141,18 @@ let minigameData=null; // For Equation Balancing Mini-game
 
 // Codex State
 let codexUnlocked = loadStore('p_codex', []);
+if(!Array.isArray(codexUnlocked))codexUnlocked=[];
+codexUnlocked=[...new Set(codexUnlocked.filter(i=>Number.isInteger(i)&&i>=0&&i<15))];
 let codexOpen = false, codexTab = 0, codexButtonStart = 0; // Tab hiện tại và vùng nút riêng của sổ công thức
-let toastMsg = '', toastTimer = 0;
+let toastMsg = '', toastTimer = 0, toastTitle = 'Thành tựu mới', toastKind = 'achievement';
+const toastQueue=[];
 
 const CODEX_UNLOCK_HINTS = [
- 'Điều kiện mở khóa chưa được lập trình trong bản hiện tại.',
- 'Kéo thanh Góc chiếu để thay đổi góc chiếu sáng.',
- 'Điều kiện mở khóa chưa được lập trình trong bản hiện tại.',
- 'Điều kiện mở khóa chưa được lập trình trong bản hiện tại.',
- 'Điều kiện mở khóa chưa được lập trình trong bản hiện tại.',
+ 'Làm nhiệt độ một ô đất đạt từ 60°C trở lên hoặc xuống 15°C.',
+ 'Kéo thanh Tiêu cự hoặc dùng W/S để thay đổi độ hội tụ ánh sáng.',
+ 'Di chuyển Góc chiếu bằng thanh trượt hoặc A/D để thay đổi vùng nắng.',
+ 'Làm nóng đất trên 70°C khi đất còn nước để tạo hơi nước.',
+ 'Tích tụ hơi nước để kích hoạt giông và quan sát tia sét.',
  'Vào màn có công cụ Hóa học, chọn Điện và dùng lên ô đất có nước.',
  'Vào màn Hóa học, làm nóng ô có đá vôi đến trên 80°C.',
  'Trong màn Hóa học, chọn Vôi và dùng lên ô đất.',
@@ -158,13 +161,13 @@ const CODEX_UNLOCK_HINTS = [
  'Giữ cây sống và đủ nước/ánh sáng để cây quang hợp.',
  'Để động vật ăn cỏ ăn cây.',
  'Tạo động vật ăn thịt và để chúng săn động vật ăn cỏ.',
- 'Điều kiện mở khóa chưa được lập trình trong bản hiện tại.',
+ 'Hoàn thành bất kỳ màn chơi nào để khôi phục cân bằng hệ sinh thái.',
  'Vào màn Hóa học và duy trì ít nhất một cây đang hoạt động.'
 ];
 
 const CODEX_ENTRIES = [
  // Physics (0-4)
- {tab:0, title:'Định luật nhiệt', formula:'Q = m / c / \\Delta T', desc:'Nhiệt lượng làm thay đổi nhiệt độ đất.'},
+ {tab:0, title:'Định luật nhiệt', formula:'Q = mc\\Delta T', desc:'Nhiệt lượng phụ thuộc vào khối lượng, nhiệt dung riêng và độ biến thiên nhiệt độ.'},
  {tab:0, title:'Thấu kính mỏng', formula:'1/f = 1/d + 1/d\'', desc:'Tiêu cự và vị trí hội tụ ánh sáng.'},
  {tab:0, title:'Nghịch đảo bình phương', formula:'I \\propto 1/r^2', desc:'Cường độ sáng suy giảm theo khoảng cách.'},
  {tab:0, title:'Cân bằng pha', formula:'H_2O_{(l)} \\rightleftharpoons H_2O_{(g)}', desc:'Quá trình bay hơi và ngưng tụ nước.'},
@@ -184,15 +187,23 @@ const CODEX_ENTRIES = [
 ];
 
 function unlockFormula(idx){
- if(!codexUnlocked.includes(idx)){
-  codexUnlocked.push(idx);
-  saveStore('p_codex', codexUnlocked);
-  triggerToast('Đã mở công thức mới trong Sổ công thức!');
-  sfx.win();
- }
+ const entry=CODEX_ENTRIES[idx];
+ if(!entry||codexUnlocked.includes(idx))return;
+ codexUnlocked.push(idx);
+ saveStore('p_codex', codexUnlocked);
+ triggerToast(entry.desc,entry.title,'formula');
+ sfx.win();
 }
-function triggerToast(msg){
- toastMsg=msg; toastTimer=3.0;
+function triggerToast(msg,title='Thành tựu mới',kind='achievement'){
+ const item={msg:String(msg||''),title:String(title||'Thành tựu mới'),kind};
+ if(toastTimer>0){toastQueue.push(item);return;}
+ toastMsg=item.msg;toastTitle=item.title;toastKind=item.kind;toastTimer=3.2;
+}
+function updateToast(dt){
+ if(toastTimer>0)toastTimer=Math.max(0,toastTimer-dt);
+ if(toastTimer<=0&&toastQueue.length){
+  const next=toastQueue.shift();toastMsg=next.msg;toastTitle=next.title;toastKind=next.kind;toastTimer=3.2;
+ }
 }
 
 // Mini-game Equations Data
@@ -609,6 +620,7 @@ function wander(a){
 function mk(x,y,e){return {x:clamp(x,0,7),y:clamp(y,0,7),fx:x,fy:y,e:clamp(e,0,100),age:0,a:1,dead:false,scaleAnim:1.4,blinkT:0,eyeDir:{x:0,y:0}};}
 
 function triggerLightning(){
+ unlockFormula(4); // Năng lượng chuyển động: hiện tượng sét trong cơn giông.
  const cx=(rand()*N)|0, cy=(rand()*N)|0;
  flash=0.6; shakeT=0.3;vibrate(120);
  sfx.crackle(); sfx.thunder();
@@ -720,6 +732,7 @@ function tick(){
   // Rain should cool the surface instead of raising its temperature.
   if(rainT>0) t.T-=0.35;
   t.T=clamp(t.T, -50, 200);
+  if(t.T>=60||t.T<=15)unlockFormula(0);
   if(t.des){t.P=0;t.W=0;t.frozen=false;continue;}
 
   // Limestone decomposition check
@@ -753,7 +766,7 @@ function tick(){
    t.P = Math.max(0, t.P - 3);
   }
 
-  if(t.T>70&&t.W>0){t.W=Math.max(0,t.W-2.5);vapor=Math.min(100,vapor+1.5);evap.push(i);}
+  if(t.T>70&&t.W>0){unlockFormula(3);t.W=Math.max(0,t.W-2.5);vapor=Math.min(100,vapor+1.5);evap.push(i);}
   if(l>.3&&t.W>20&&t.T>=30&&t.T<=65&&(!hasChem||(t.pH>=5.5&&t.pH<=8.5))){
    const pv=t.P;
    let canGrow = !hasChem || co2 > 10;
@@ -933,6 +946,7 @@ function finish(){
 
  if(c.p>=g.p&&c.h>=g.h&&c.c>=g.c && passChem){
   state='win';sfx.win();
+  unlockFormula(13); // Hoàn thành mục tiêu để khôi phục cân bằng hệ sinh thái.
   let stars = 1;
   if(c.p>=g.p+2 && c.h>=g.h+2 && c.c>=g.c+2) stars = 2;
   let hasDesert = false;
@@ -1585,11 +1599,6 @@ function drawHUD(){
   button('⚙',W-36*S,actionY,28*S,27*S,()=>openSettings('play'),'#8ecbff');
  }
 
- if(toastTimer > 0){
-  toastTimer -= 0.016;
-  ctx.fillStyle='rgba(30,50,70,0.9)'; rr(ctx, W/2 - 140*S, H*0.12, 280*S, 32*S, 16*S); ctx.fill();
-  txt(toastMsg, W/2, H*0.12 + 20*S, 12*S, '#ffe28a', 'center', '700');
- }
 }
 
 const sliderY=i=>H-(isSandbox?235*S:(LEVELS[lvl]&&LEVELS[lvl].chem?230*S:195*S))+i*50*S;
@@ -1730,6 +1739,29 @@ function drawCodex(){
  }
  button('Đóng',cx,panelY+panelH*.91,120*S,34*S,()=>{codexOpen=false;},'#ffd36b');
 }
+function drawCodexToast(){
+ if(toastTimer<=0||!toastMsg)return;
+ const panelW=Math.max(1,Math.min(310*S,W-20*S)),panelH=70*S;
+ const x=W-10*S-panelW,y=82*S;
+ const accent=toastKind==='formula'?'#b08af0':toastKind==='success'?'#7fe3a0':toastKind==='info'?'#8ecbff':'#e6b35a';
+ ctx.save();
+ ctx.globalAlpha=Math.min(1,toastTimer<.28?toastTimer/.28:1);
+ rr(ctx,x,y,panelW,panelH,12*S);
+ ctx.fillStyle='rgba(10,22,32,.96)';ctx.fill();
+ ctx.strokeStyle=accent;ctx.lineWidth=1.5*S;ctx.stroke();
+ rr(ctx,x,y,4*S,panelH,2*S);ctx.fillStyle=accent;ctx.fill();
+ ctx.beginPath();ctx.arc(x+23*S,y+23*S,11*S,0,Math.PI*2);ctx.fillStyle=accent;ctx.fill();
+ ctx.font='900 '+Math.max(10,12*S)+'px '+FONT_STACK;ctx.fillStyle='#102019';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(toastKind==='formula'?'ƒ':toastKind==='success'?'✓':toastKind==='info'?'i':'★',x+23*S,y+23*S);
+ txt(toastKind==='formula'?'SỔ CÔNG THỨC':toastKind==='success'?'THÀNH TỰU HOÀN THÀNH':toastKind==='info'?'THÔNG BÁO':'THÀNH TỰU MỚI',x+43*S,y+13*S,Math.max(8,8*S),'#91dcb4','left','800');
+ txt(toastTitle,x+43*S,y+28*S,Math.max(10,11*S),'#f2fff7','left','800');
+ const maxW=panelW-54*S,bodySize=Math.max(8,9*S);
+ ctx.font='500 '+bodySize+'px '+FONT_STACK;
+ const words=toastMsg.split(/\s+/),lines=[];let line='';
+ for(const word of words){const next=(line+' '+word).trim();if(line&&ctx.measureText(next).width>maxW){lines.push(line);line=word;}else line=next;}
+ if(line)lines.push(line);
+ lines.slice(0,2).forEach((ln,i)=>txt(ln,x+43*S,y+43*S+i*11*S,bodySize,'#c7d9d2','left','500'));
+ ctx.restore();
+}
 // ---------- Balancing Mini-Game Overlay ----------
 function drawMinigame(){
  if(!minigameData) return;
@@ -1764,8 +1796,8 @@ function drawMinigame(){
   const finish=minigameData.onFinish;
   if(solved&&minigameData.eq.reward==='lime')limeCharges=Math.min(9,limeCharges+1);
   if(solved&&minigameData.eq.reward==='elec')elecCharges=Math.min(9,elecCharges+1);
-  if(!solved){toastMsg='Chưa cân bằng đúng — thử lại ở lần sau.';toastTimer=2.5;}
-  else{toastMsg='Chính xác! Nhận thêm tài nguyên.';toastTimer=2.5;}
+  if(!solved)triggerToast('Thử điều chỉnh hệ số rồi xác nhận lại.','Phương trình chưa cân bằng','info');
+  else triggerToast('Bạn nhận thêm tài nguyên hóa học.','Phương trình chính xác','success');
   if(finish)finish();
   minigameData=null;
  }, '#7fe3a0');
@@ -1971,7 +2003,7 @@ function drawOverlay(){
 // ---------- Input Handling ----------
 let drag=null, pendingSliderValue=null, hoverPoint=null;
 function ptr(e){const r=cv.getBoundingClientRect();canvasRect=r;return [(e.clientX-r.left)*(VIEWW/Math.max(1,r.width))-gameOffset,(e.clientY-r.top)*(H/Math.max(1,r.height))];}
-function setSlider(i,x){const sl=controlLayout.sliders[i];if(!sl)return;const v=clamp((x-sl.x0)/(sl.x1-sl.x0),0,1);if(i===0){if(Math.abs(s1-v)>0.00001){s1=v;unlockFormula(1);}}else s2=v;}
+function setSlider(i,x){const sl=controlLayout.sliders[i];if(!sl)return;const v=clamp((x-sl.x0)/(sl.x1-sl.x0),0,1);if(i===0){if(Math.abs(s1-v)>0.00001){s1=v;unlockFormula(2);}}else if(Math.abs(s2-v)>0.00001){s2=v;unlockFormula(1);}}
 function hitButton(x,y){let best=null,bestScore=Infinity;for(const b of btns){if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){const score=Math.hypot(x-(b.x+b.w/2),y-(b.y+b.h/2));if(score<bestScore){best=b;bestScore=score;}}}return best;}
 function hitInputControl(x,y){
  let best=null,bestScore=Infinity;
@@ -2013,7 +2045,7 @@ cv.addEventListener('pointerdown',e=>{
    const solved=minigameData.eq.ans.every((v,i)=>v===minigameData.vals[i]),finish=minigameData.onFinish;
    if(solved&&minigameData.eq.reward==='lime')limeCharges=Math.min(9,limeCharges+1);
    if(solved&&minigameData.eq.reward==='elec')elecCharges=Math.min(9,elecCharges+1);
-   toastMsg=solved?'Chính xác! Nhận thêm tài nguyên.':'Chưa cân bằng đúng — thử lại ở lần sau.';toastTimer=2.5;
+   if(solved)triggerToast('Bạn nhận thêm tài nguyên hóa học.','Phương trình chính xác','success');else triggerToast('Thử điều chỉnh hệ số rồi xác nhận lại.','Phương trình chưa cân bằng','info');
    if(finish)finish();minigameData=null;return;
   }
   if(Math.abs(p[1]-confirmY)<=24*S&&Math.abs(p[0]-(cx+70*S))<=56*S){const finish=minigameData.onFinish;if(finish)finish();minigameData=null;return;}
@@ -2084,17 +2116,17 @@ let last=0,backgroundGradient=null,backgroundGradientKey='';
 function frame(ts){
  try{
   const dt=Math.min(.1,(ts-last)/1000||0);last=ts;
-  tAll+=dt;stateT+=dt;
+  tAll+=dt;stateT+=dt;updateToast(dt);
    if(state==='play'&&heldKeys.size){
     for(const [key,held] of heldKeys){const age=held+dt;heldKeys.set(key,age);const accel=age>.4?Math.min(2.5,1+(age-.4)*1.8):1;const step=dt*.22*accel;
-     if(key==='arrowleft'||key==='a')s1=clamp(s1-step,0,1);
-     if(key==='arrowright'||key==='d')s1=clamp(s1+step,0,1);
-     if(key==='arrowup'||key==='w')s2=clamp(s2+step,0,1);
-     if(key==='arrowdown'||key==='s')s2=clamp(s2-step,0,1);
+     if(key==='arrowleft'||key==='a'){const old=s1;s1=clamp(s1-step,0,1);if(Math.abs(s1-old)>0.00001)unlockFormula(2);}
+     if(key==='arrowright'||key==='d'){const old=s1;s1=clamp(s1+step,0,1);if(Math.abs(s1-old)>0.00001)unlockFormula(2);}
+     if(key==='arrowup'||key==='w'){const old=s2;s2=clamp(s2+step,0,1);if(Math.abs(s2-old)>0.00001)unlockFormula(1);}
+     if(key==='arrowdown'||key==='s'){const old=s2;s2=clamp(s2-step,0,1);if(Math.abs(s2-old)>0.00001)unlockFormula(1);}
     }
    }
 
-  if(pendingSliderValue!==null&&drag){const sl=controlLayout.sliders[drag.i];if(sl){const v=pendingSliderValue;pendingSliderValue=null;if(drag.i===0){if(Math.abs(s1-v)>0.00001){s1=v;unlockFormula(1);}}else s2=v;}}
+  if(pendingSliderValue!==null&&drag){const sl=controlLayout.sliders[drag.i];if(sl){const v=pendingSliderValue;pendingSliderValue=null;if(drag.i===0){if(Math.abs(s1-v)>0.00001){s1=v;unlockFormula(2);}}else if(Math.abs(s2-v)>0.00001){s2=v;unlockFormula(1);}}}
 
   frameTimeHistory.push(dt);
   if(frameTimeHistory.length > 30){
@@ -2186,6 +2218,7 @@ function frame(ts){
   if(tutorialActive)drawTutorial();
    if(codexOpen) drawCodex();
   if(minigameData) drawMinigame();
+  if(textReady&&toastTimer>0)drawCodexToast();
   ctx.restore();
 
  }catch(err){
